@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { db } from './firebase';
-import { collection, getDocs, deleteDoc, doc, updateDoc, addDoc, serverTimestamp, query, where, onSnapshot } from 'firebase/firestore';
-
+import React, { useEffect, useState, useRef } from 'react';
+import { db, storage } from './firebase';
+import {
+  collection, getDocs, deleteDoc, doc, updateDoc,
+  addDoc, serverTimestamp, query, where, onSnapshot
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 function TruckList() {
   const [trucks, setTrucks] = useState([]);
@@ -10,12 +13,19 @@ function TruckList() {
   const [editData, setEditData] = useState({});
   const [commentData, setCommentData] = useState({});
   const [comments, setComments] = useState({});
-  const [previewImage, setPreviewImage] = useState(null);
   const [favorites, setFavorites] = useState([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
+  // 新增餐車用狀態
+  const [newTruckName, setNewTruckName] = useState('');
+  const [newTruckLocation, setNewTruckLocation] = useState('管理大樓');
+  const [newTruckType, setNewTruckType] = useState('小吃');
+  const [newTruckImageFile, setNewTruckImageFile] = useState(null);
+  const [newTruckImagePreview, setNewTruckImagePreview] = useState(null);
 
-  // 抓取 Firestore 資料
+  const canvasRef = useRef(null);
+
+  // 讀取餐車資料
   useEffect(() => {
     const fetchData = async () => {
       const querySnapshot = await getDocs(collection(db, 'trucks'));
@@ -28,31 +38,46 @@ function TruckList() {
     fetchData();
   }, []);
 
+  // 監聽評論
   useEffect(() => {
-  const unsubscribeFns = [];
+    const unsubscribeFns = [];
 
-  const fetchComments = async () => {
-    trucks.forEach(truck => {
-      const reviewsRef = collection(db, 'trucks', truck.id, 'reviews');
+    const fetchComments = async () => {
+      trucks.forEach(truck => {
+        const reviewsRef = collection(db, 'trucks', truck.id, 'reviews');
 
-      const unsubscribe = onSnapshot(reviewsRef, snapshot => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setComments(prev => ({ ...prev, [truck.id]: data }));
+        const unsubscribe = onSnapshot(reviewsRef, snapshot => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setComments(prev => ({ ...prev, [truck.id]: data }));
+        });
+
+        unsubscribeFns.push(unsubscribe);
       });
+    };
 
-      unsubscribeFns.push(unsubscribe);
-    });
-  };
+    if (trucks.length > 0) fetchComments();
 
-  if (trucks.length > 0) fetchComments();
-
-  return () => {
-    unsubscribeFns.forEach(unsub => unsub());
-  };
+    return () => {
+      unsubscribeFns.forEach(unsub => unsub());
+    };
   }, [trucks]);
+
+  // 監聽收藏餐車
+  useEffect(() => {
+    const q = query(collection(db, 'favorites'), where('userId', '==', 'demo-user'));
+    const unsubscribe = onSnapshot(q, snapshot => {
+      const favs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setFavorites(favs);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // 刪除餐車
   const handleDelete = async (id) => {
@@ -64,8 +89,8 @@ function TruckList() {
 
   // 儲存編輯後資料
   const handleSave = async (id) => {
-    const ref = doc(db, 'trucks', id);
-    await updateDoc(ref, {
+    const refDoc = doc(db, 'trucks', id);
+    await updateDoc(refDoc, {
       name: editData.name,
       location: editData.location,
       type: editData.type,
@@ -85,69 +110,191 @@ function TruckList() {
     return matchSearch && matchFavorite;
   });
 
-  // 評分系統
+  // 評分系統 - 新增評論
   const handleCommentSubmit = async (truckId) => {
-  if (!commentData[truckId]?.comment || !commentData[truckId]?.rating) {
-    alert('請輸入評分與評論內容');
-    return;
-  }
+    if (!commentData[truckId]?.comment || !commentData[truckId]?.rating) {
+      alert('請輸入評分與評論內容');
+      return;
+    }
 
-  // 檢查評分範圍
-  await addDoc(collection(db, 'trucks', truckId, 'reviews'), {
-    userId: 'demo-user', // 之後接入 Firebase Auth 再改為動態值
-    rating: Number(commentData[truckId].rating),
-    comment: commentData[truckId].comment,
-    timestamp: serverTimestamp(),
-  });
-
-  // 清空評論欄位
-  setCommentData(prev => ({ ...prev, [truckId]: { rating: '', comment: '' } }));
-  alert('評論成功！');
-  };
-
-  const getAverageRating = (truckId) => {
-  const truckComments = comments[truckId];
-  if (!truckComments || truckComments.length === 0) return null;
-
-  const total = truckComments.reduce((sum, c) => sum + (c.rating || 0), 0);
-  return (total / truckComments.length).toFixed(1); // 保留一位小數
-  };
-
-  // 收藏餐車
-  useEffect(() => {
-    const q = query(collection(db, 'favorites'), where('userId', '==', 'demo-user'));
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const favs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setFavorites(favs);
+    await addDoc(collection(db, 'trucks', truckId, 'reviews'), {
+      userId: 'demo-user',
+      rating: Number(commentData[truckId].rating),
+      comment: commentData[truckId].comment,
+      timestamp: serverTimestamp(),
     });
 
-    return () => unsubscribe();
-  }, []);
+    setCommentData(prev => ({ ...prev, [truckId]: { rating: '', comment: '' } }));
+    alert('評論成功！');
+  };
 
+  // 計算平均評分
+  const getAverageRating = (truckId) => {
+    const truckComments = comments[truckId];
+    if (!truckComments || truckComments.length === 0) return null;
+
+    const total = truckComments.reduce((sum, c) => sum + (c.rating || 0), 0);
+    return (total / truckComments.length).toFixed(1);
+  };
+
+  // 收藏判斷
   const isFavorite = (truckId) => {
     return favorites.some(fav => fav.truckId === truckId);
   };
 
+  // 收藏切換
   const toggleFavorite = async (truckId) => {
     const existing = favorites.find(fav => fav.truckId === truckId);
     if (existing) {
-      // 已收藏，取消
       await deleteDoc(doc(db, 'favorites', existing.id));
     } else {
-      // 尚未收藏，新增
       await addDoc(collection(db, 'favorites'), {
-        userId: 'demo-user', // 之後用 Firebase Auth 替換
+        userId: 'demo-user',
         truckId,
       });
     }
   };
 
+  // 新增餐車 - 圖片檔案選擇後顯示預覽（Canvas）
+  const handleNewImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setNewTruckImageFile(file);
+
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        // 調整 canvas 大小跟圖片一樣
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 新增餐車 - 上傳圖片到 Firebase Storage 並新增資料
+  const handleAddTruck = async () => {
+    if (!newTruckName.trim()) {
+      alert('請輸入餐車名稱');
+      return;
+    }
+    if (!newTruckImageFile) {
+      alert('請選擇餐車圖片');
+      return;
+    }
+
+    // 上傳圖片到 Storage
+    const storageRef = ref(storage, `trucks/${Date.now()}_${newTruckImageFile.name}`);
+    try {
+      await uploadBytes(storageRef, newTruckImageFile);
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      // 新增 Firestore 文件
+      const docRef = await addDoc(collection(db, 'trucks'), {
+        name: newTruckName,
+        location: newTruckLocation,
+        type: newTruckType,
+        imageUrl: downloadUrl,
+        createdAt: serverTimestamp(),
+      });
+
+      // 更新本地狀態
+      setTrucks(prev => [
+        ...prev,
+        {
+          id: docRef.id,
+          name: newTruckName,
+          location: newTruckLocation,
+          type: newTruckType,
+          imageUrl: downloadUrl,
+        }
+      ]);
+
+      // 清空表單
+      setNewTruckName('');
+      setNewTruckLocation('管理大樓');
+      setNewTruckType('小吃');
+      setNewTruckImageFile(null);
+
+      // 清空畫布
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      alert('新增餐車成功！');
+
+    } catch (error) {
+      alert('圖片上傳失敗，請再試一次');
+      console.error(error);
+    }
+  };
 
   return (
-    <div>
+    <div style={{ padding: '1rem' }}>
+      <h2>新增餐車</h2>
+      <div style={{ marginBottom: '1rem' }}>
+        <input
+          type="text"
+          placeholder="餐車名稱"
+          value={newTruckName}
+          onChange={e => setNewTruckName(e.target.value)}
+          style={{ marginRight: '10px', padding: '0.5rem' }}
+        />
+
+        {/* 地點下拉 */}
+        <select
+          value={newTruckLocation}
+          onChange={e => setNewTruckLocation(e.target.value)}
+          style={{ marginRight: '10px', padding: '0.5rem' }}
+        >
+          <option>管理大樓</option>
+          <option>工學大樓</option>
+          <option>明德樓</option>
+          <option>藴德樓</option>
+        </select>
+
+        {/* 類型下拉 */}
+        <select
+          value={newTruckType}
+          onChange={e => setNewTruckType(e.target.value)}
+          style={{ marginRight: '10px', padding: '0.5rem' }}
+        >
+          <option>小吃</option>
+          <option>中式料理</option>
+          <option>日式料理</option>
+          <option>韓式料理</option>
+          <option>西式料理</option>
+          <option>素食</option>
+          <option>甜點／甜品</option>
+          <option>飲料／咖啡</option>
+          <option>麵食</option>
+          <option>海鮮</option>
+          <option>烤肉／燒烤</option>
+          <option>速食</option>
+          <option>早餐</option>
+          <option>其他</option>
+        </select>
+      </div>
+
+      {/* 圖片上傳及 Canvas 顯示 */}
+      <div style={{ marginBottom: '1rem' }}>
+        <input type="file" accept="image/*" onChange={handleNewImageChange} />
+      </div>
+      <canvas ref={canvasRef} style={{ maxWidth: '300px', border: '1px solid #ccc', marginBottom: '1rem' }} />
+
+      <button onClick={handleAddTruck} style={{ padding: '0.5rem 1rem' }}>新增餐車</button>
+
+      <hr style={{ margin: '2rem 0' }} />
+
       <h2>目前餐車列表</h2>
 
       {/* 搜尋框 */}
@@ -184,9 +331,7 @@ function TruckList() {
             alt={truck.name}
             width="200"
             style={{ marginBottom: '10px', cursor: 'pointer' }}
-            onClick={() => setPreviewImage(truck.imageUrl)}
           />
-
 
           {editingId === truck.id ? (
             <div>
@@ -197,139 +342,134 @@ function TruckList() {
                 }
                 placeholder="餐車名稱"
               />
-              <input
+              <select
                 value={editData.location}
                 onChange={e =>
                   setEditData({ ...editData, location: e.target.value })
                 }
-                placeholder="地點"
-              />
-              <input
+              >
+                <option>管理大樓</option>
+                <option>工學大樓</option>
+                <option>明德樓</option>
+                <option>藴德樓</option>
+              </select>
+              <select
                 value={editData.type}
                 onChange={e =>
                   setEditData({ ...editData, type: e.target.value })
                 }
-                placeholder="類型"
-              />
+              >
+                <option>小吃</option>
+                <option>中式料理</option>
+                <option>日式料理</option>
+                <option>韓式料理</option>
+                <option>西式料理</option>
+                <option>素食</option>
+                <option>甜點／甜品</option>
+                <option>飲料／咖啡</option>
+                <option>麵食</option>
+                <option>海鮮</option>
+                <option>烤肉／燒烤</option>
+                <option>速食</option>
+                <option>早餐</option>
+                <option>其他</option>
+              </select>
+
+              {/* 編輯時可更換圖片 */}
               <input
-                value={editData.imageUrl}
-                onChange={e =>
-                  setEditData({ ...editData, imageUrl: e.target.value })
-                }
-                placeholder="圖片 URL"
-                style={{ marginTop: '5px', marginBottom: '5px' }}
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+
+                  // 上傳新圖片
+                  const storageRef = ref(storage, `trucks/${Date.now()}_${file.name}`);
+                  await uploadBytes(storageRef, file);
+                  const url = await getDownloadURL(storageRef);
+                  setEditData(prev => ({ ...prev, imageUrl: url }));
+                }}
+                style={{ marginTop: '5px' }}
               />
 
-              <br />
-              <button onClick={() => handleSave(truck.id)}>儲存</button>
-              <button onClick={() => setEditingId(null)}>取消</button>
+              <div style={{ marginTop: '5px' }}>
+                <button onClick={() => handleSave(truck.id)}>儲存</button>
+                <button onClick={() => setEditingId(null)}>取消</button>
+              </div>
             </div>
           ) : (
             <>
               <h3>{truck.name}</h3>
-              <p>📍 地點：{truck.location}</p>
-              <p>🍱 類型：{truck.type}</p>
-              <p>⭐ 平均評分：{getAverageRating(truck.id) ?? '尚無評分'}</p>
+              <p>地點：{truck.location}</p>
+              <p>類型：{truck.type}</p>
 
+              <button onClick={() => {
+                setEditingId(truck.id);
+                setEditData({
+                  name: truck.name,
+                  location: truck.location,
+                  type: truck.type,
+                  imageUrl: truck.imageUrl,
+                });
+              }}>編輯</button>
 
-              <button
-                onClick={() => {
-                  setEditingId(truck.id);
-                  setEditData(truck);
-                }}
-              >
-                編輯
-              </button>
               <button onClick={() => handleDelete(truck.id)}>刪除</button>
-              {/* 顯示評論 */}
+
+              <button onClick={() => toggleFavorite(truck.id)}>
+                {isFavorite(truck.id) ? '取消收藏' : '收藏'}
+              </button>
+
+              {/* 評論區 */}
               <div style={{ marginTop: '10px' }}>
-                <h4>📝 評論區：</h4>
-                {comments[truck.id]?.length > 0 ? (
-                  comments[truck.id].map(comment => (
-                    <div key={comment.id} style={{ borderTop: '1px solid #eee', paddingTop: '5px' }}>
-                      <p><strong>{comment.user || '匿名使用者'}：</strong> {comment.text || comment.comment}</p>
-                      <p>⭐ 評分：{comment.rating || '未提供'}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p>尚無評論。</p>
-                )}
+                <strong>平均評分: </strong>
+                {getAverageRating(truck.id) ?? '尚無評分'}
               </div>
 
-              {/* 評論區塊 */}
+              <div>
+                {(comments[truck.id] || []).map(c => (
+                  <div key={c.id} style={{ borderTop: '1px solid #ccc', marginTop: '5px' }}>
+                    <p>⭐ {c.rating}</p>
+                    <p>{c.comment}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* 新增評論 */}
               <div style={{ marginTop: '10px' }}>
-                <h4>新增評論</h4>
                 <input
                   type="number"
                   min="1"
                   max="5"
-                  placeholder="評分（1~5）"
+                  placeholder="評分 (1~5)"
                   value={commentData[truck.id]?.rating || ''}
-                  onChange={e =>
-                    setCommentData(prev => ({
-                      ...prev,
-                      [truck.id]: {
-                        ...prev[truck.id],
-                        rating: e.target.value
-                      }
-                    }))
-                  }
-                  style={{ width: '100px', marginRight: '10px' }}
+                  onChange={e => setCommentData(prev => ({
+                    ...prev,
+                    [truck.id]: {
+                      ...prev[truck.id],
+                      rating: e.target.value,
+                    }
+                  }))}
+                  style={{ width: '80px', marginRight: '10px' }}
                 />
                 <input
                   type="text"
-                  placeholder="撰寫評論"
+                  placeholder="寫下你的評論"
                   value={commentData[truck.id]?.comment || ''}
-                  onChange={e =>
-                    setCommentData(prev => ({
-                      ...prev,
-                      [truck.id]: {
-                        ...prev[truck.id],
-                        comment: e.target.value
-                      }
-                    }))
-                  }
+                  onChange={e => setCommentData(prev => ({
+                    ...prev,
+                    [truck.id]: {
+                      ...prev[truck.id],
+                      comment: e.target.value,
+                    }
+                  }))}
                   style={{ width: '300px', marginRight: '10px' }}
                 />
                 <button onClick={() => handleCommentSubmit(truck.id)}>送出評論</button>
-                <button onClick={() => toggleFavorite(truck.id)}>
-                  {isFavorite(truck.id) ? '取消收藏 💔' : '收藏 ❤️'}
-                </button>
               </div>
-
             </>
           )}
         </div>
       ))}
-      {previewImage && (
-        <div
-          onClick={() => setPreviewImage(null)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-          }}
-        >
-          <img
-            src={previewImage}
-            alt="預覽圖"
-            style={{
-              maxWidth: '90%',
-              maxHeight: '90%',
-              boxShadow: '0 0 20px white',
-              borderRadius: '10px',
-            }}
-          />
-        </div>
-      )}
-
     </div>
   );
 }
