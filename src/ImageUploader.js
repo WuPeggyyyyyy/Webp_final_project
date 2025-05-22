@@ -1,53 +1,77 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState } from 'react';
+import { Stack, Button, Typography, CircularProgress } from '@mui/material';
 
-function ImageUploader({ onUploadSuccess }) {
-  const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+const CLOUD_NAME = 'duij4v2sx';
+const UPLOAD_PRESET = 'CGUfoodtruck_preset';
+const MAX_IMAGES = 4;
+
+const ImageUploader = ({ onUpload }) => {
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadedUrls, setUploadedUrls] = useState([]);
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files).slice(0, MAX_IMAGES);
+    setSelectedFiles(files);
+  };
 
   const handleUpload = async () => {
-    if (!imageFile) return;
     setUploading(true);
+    const urls = [];
 
-    const formData = new FormData();
-    formData.append("file", imageFile);
-    formData.append("upload_preset", "CGUfoodtruck_preset"); // 替換成你的 preset 名稱
+    for (const file of selectedFiles) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', UPLOAD_PRESET);
 
-    try {
-      const res = await axios.post(
-        "https://api.cloudinary.com/v1_1/duij4v2sx/image/upload",
-        formData
-      );
-      const imageUrl = res.data.secure_url;
-      onUploadSuccess(imageUrl); // 把 URL 傳出去
-      setPreviewUrl(imageUrl);
-    } catch (err) {
-      console.error("上傳失敗", err);
-      alert("圖片上傳失敗");
+      try {
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        urls.push(data.secure_url);
+      } catch (err) {
+        console.error('Upload failed:', err);
+      }
     }
 
+    setUploadedUrls(urls);
+    onUpload(urls); // 回傳網址
     setUploading(false);
   };
 
   return (
-    <div>
+    <Stack spacing={2}>
       <input
         type="file"
         accept="image/*"
-        onChange={(e) => setImageFile(e.target.files[0])}
+        multiple
+        onChange={handleFileChange}
+        disabled={uploading}
       />
-      <button onClick={handleUpload} disabled={uploading}>
-        {uploading ? "上傳中..." : "上傳圖片"}
-      </button>
-      {previewUrl && (
-        <div>
-          <p>預覽圖片：</p>
-          <img src={previewUrl} alt="預覽" width="200" />
-        </div>
+      <Button
+        variant="outlined"
+        onClick={handleUpload}
+        disabled={uploading || selectedFiles.length === 0}
+      >
+        {uploading ? <CircularProgress size={20} /> : `上傳 ${selectedFiles.length} 張圖片`}
+      </Button>
+
+      {uploadedUrls.length > 0 && (
+        <Stack direction="row" spacing={1}>
+          {uploadedUrls.map((url, idx) => (
+            <img
+              key={idx}
+              src={url}
+              alt={`上傳圖片 ${idx + 1}`}
+              style={{ width: 60, height: 60, borderRadius: 8 }}
+            />
+          ))}
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
-}
+};
 
 export default ImageUploader;
