@@ -38,9 +38,9 @@ function AddTruckForm() {
 //       <input placeholder="地點" value={location} onChange={e => setLocation(e.target.value)} />
 //       <input placeholder="類型" value={type} onChange={e => setType(e.target.value)} />
 
-//       <ImageUploader onUploadSuccess={setImageUrl} />
+//       <ImageUploader onUploadSuccess={setImageUrls} />
 
-//       <button type="submit" disabled={!imageUrl}>新增餐車</button>
+//       <button type="submit" disabled={!imageUrls}>新增餐車</button>
 //     </form>
 //   );
  }

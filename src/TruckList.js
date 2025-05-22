@@ -209,10 +209,10 @@ function TruckList() {
       return;
     }
 
-    const handleAddImageUrl = (truckId, imageUrl) => {
+    const handleAddImageUrls = (truckId, imageUrls) => {
       setNewTruckImageUrls((prev) => ({
         ...prev,
-        [truckId]: [...(prev[truckId] || []), imageUrl],
+        [truckId]: [...(prev[truckId] || []), imageUrls],
       }));
     };
 
@@ -235,7 +235,7 @@ function TruckList() {
         name: newTruckName,
         location: newTruckLocation,
         type: newTruckType,
-        imageUrl: downloadUrl,
+        imageUrls: downloadUrl,
         createdAt: serverTimestamp(),
       });
 
@@ -247,7 +247,7 @@ function TruckList() {
           name: newTruckName,
           location: newTruckLocation,
           type: newTruckType,
-          imageUrl: downloadUrl,
+          imageUrls: downloadUrl,
           imageUrls: newTruckImageUrls,
         }
       ]);
@@ -363,7 +363,7 @@ function TruckList() {
           }}
         >
           <img
-            src={truck.imageUrl}
+            src={truck.imageUrls}
             alt={truck.name}
             width="200"
             style={{ marginBottom: '10px', cursor: 'pointer' }}
