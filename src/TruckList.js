@@ -10,9 +10,10 @@ function TruckList() {
   const [trucks, setTrucks] = useState([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({});
+  const [editData, setEditData] = useState({ name: '', location: '', type: '', imageUrls: [] });
   const [commentData, setCommentData] = useState({});
   const [comments, setComments] = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
   const [favorites, setFavorites] = useState([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
@@ -22,6 +23,7 @@ function TruckList() {
   const [newTruckType, setNewTruckType] = useState('小吃');
   const [newTruckImageFile, setNewTruckImageFile] = useState(null);
   const [newTruckImagePreview, setNewTruckImagePreview] = useState(null);
+  const [newTruckImageUrls, setNewTruckImageUrls] = useState({});
 
   const canvasRef = useRef(null);
 
@@ -40,29 +42,29 @@ function TruckList() {
 
   // 監聽評論
   useEffect(() => {
-    const unsubscribeFns = [];
+  const unsubscribeFns = [];
 
-    const fetchComments = async () => {
-      trucks.forEach(truck => {
-        const reviewsRef = collection(db, 'trucks', truck.id, 'reviews');
+  const fetchComments = async () => {
+    trucks.forEach(truck => {
+      const reviewsRef = collection(db, 'trucks', truck.id, 'reviews');
 
-        const unsubscribe = onSnapshot(reviewsRef, snapshot => {
-          const data = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          setComments(prev => ({ ...prev, [truck.id]: data }));
-        });
-
-        unsubscribeFns.push(unsubscribe);
+      const unsubscribe = onSnapshot(reviewsRef, snapshot => {
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setComments(prev => ({ ...prev, [truck.id]: data }));
       });
-    };
 
-    if (trucks.length > 0) fetchComments();
+      unsubscribeFns.push(unsubscribe);
+    });
+  };
 
-    return () => {
-      unsubscribeFns.forEach(unsub => unsub());
-    };
+  if (trucks.length > 0) fetchComments();
+
+  return () => {
+    unsubscribeFns.forEach(unsub => unsub());
+  };
   }, [trucks]);
 
   // 監聽收藏餐車
@@ -94,7 +96,7 @@ function TruckList() {
       name: editData.name,
       location: editData.location,
       type: editData.type,
-      imageUrl: editData.imageUrl,
+      imageUrls: editData.imageUrls,
     });
     setEditingId(null);
     const updated = trucks.map(t =>
@@ -112,32 +114,47 @@ function TruckList() {
 
   // 評分系統 - 新增評論
   const handleCommentSubmit = async (truckId) => {
-    if (!commentData[truckId]?.comment || !commentData[truckId]?.rating) {
-      alert('請輸入評分與評論內容');
-      return;
-    }
+  if (!commentData[truckId]?.comment || !commentData[truckId]?.rating) {
+    alert('請輸入評分與評論內容');
+    return;
+  }
 
-    await addDoc(collection(db, 'trucks', truckId, 'reviews'), {
-      userId: 'demo-user',
-      rating: Number(commentData[truckId].rating),
-      comment: commentData[truckId].comment,
-      timestamp: serverTimestamp(),
-    });
+  // 檢查評分範圍
+  await addDoc(collection(db, 'trucks', truckId, 'reviews'), {
+    userId: 'demo-user', // 之後接入 Firebase Auth 再改為動態值
+    rating: Number(commentData[truckId].rating),
+    comment: commentData[truckId].comment,
+    timestamp: serverTimestamp(),
+  });
 
-    setCommentData(prev => ({ ...prev, [truckId]: { rating: '', comment: '' } }));
-    alert('評論成功！');
+  // 清空評論欄位
+  setCommentData(prev => ({ ...prev, [truckId]: { rating: '', comment: '' } }));
+  alert('評論成功！');
   };
 
   // 計算平均評分
   const getAverageRating = (truckId) => {
-    const truckComments = comments[truckId];
-    if (!truckComments || truckComments.length === 0) return null;
+  const truckComments = comments[truckId];
+  if (!truckComments || truckComments.length === 0) return null;
 
-    const total = truckComments.reduce((sum, c) => sum + (c.rating || 0), 0);
+  const total = truckComments.reduce((sum, c) => sum + (c.rating || 0), 0);
     return (total / truckComments.length).toFixed(1);
   };
 
-  // 收藏判斷
+  // 收藏餐車
+  useEffect(() => {
+    const q = query(collection(db, 'favorites'), where('userId', '==', 'demo-user'));
+    const unsubscribe = onSnapshot(q, snapshot => {
+      const favs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setFavorites(favs);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const isFavorite = (truckId) => {
     return favorites.some(fav => fav.truckId === truckId);
   };
@@ -146,10 +163,12 @@ function TruckList() {
   const toggleFavorite = async (truckId) => {
     const existing = favorites.find(fav => fav.truckId === truckId);
     if (existing) {
+      // 已收藏，取消
       await deleteDoc(doc(db, 'favorites', existing.id));
     } else {
+      // 尚未收藏，新增
       await addDoc(collection(db, 'favorites'), {
-        userId: 'demo-user',
+        userId: 'demo-user', // 之後用 Firebase Auth 替換
         truckId,
       });
     }
@@ -190,6 +209,21 @@ function TruckList() {
       return;
     }
 
+    const handleAddImageUrl = (truckId, imageUrl) => {
+      setNewTruckImageUrls((prev) => ({
+        ...prev,
+        [truckId]: [...(prev[truckId] || []), imageUrl],
+      }));
+    };
+
+    const handleDeleteImage = (truckId, indexToDelete) => {
+      setNewTruckImageUrls((prev) => ({
+        ...prev,
+        [truckId]: prev[truckId].filter((_, index) => index !== indexToDelete),
+      }));
+    };
+
+
     // 上傳圖片到 Storage
     const storageRef = ref(storage, `trucks/${Date.now()}_${newTruckImageFile.name}`);
     try {
@@ -214,6 +248,7 @@ function TruckList() {
           location: newTruckLocation,
           type: newTruckType,
           imageUrl: downloadUrl,
+          imageUrls: newTruckImageUrls,
         }
       ]);
 
@@ -222,6 +257,7 @@ function TruckList() {
       setNewTruckLocation('管理大樓');
       setNewTruckType('小吃');
       setNewTruckImageFile(null);
+      setNewTruckImageUrls([]);
 
       // 清空畫布
       const canvas = canvasRef.current;
@@ -333,6 +369,29 @@ function TruckList() {
             style={{ marginBottom: '10px', cursor: 'pointer' }}
           />
 
+          {truck.imageUrls?.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                overflowX: 'auto',
+                gap: '10px',
+                marginBottom: '10px',
+                paddingBottom: '5px',
+              }}
+            >
+              {truck.imageUrls.map((url, index) => (
+                <img
+                  key={index}
+                  src={url}
+                  alt={`餐車圖片-${index}`}
+                  width="150"
+                  style={{ borderRadius: '8px', cursor: 'pointer' }}
+                  onClick={() => setPreviewImage(url)}
+                />
+              ))}
+            </div>
+          )}
+
           {editingId === truck.id ? (
             <div>
               <input
@@ -379,38 +438,104 @@ function TruckList() {
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
+                  const files = Array.from(e.target.files);
+                  const newImageUrls = [];
 
-                  // 上傳新圖片
-                  const storageRef = ref(storage, `trucks/${Date.now()}_${file.name}`);
-                  await uploadBytes(storageRef, file);
-                  const url = await getDownloadURL(storageRef);
-                  setEditData(prev => ({ ...prev, imageUrl: url }));
+                  for (const file of files) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('upload_preset', 'CGUfoodtruck_preset');
+
+                    const res = await fetch('https://api.cloudinary.com/v1_1/duij4v2sx/image/upload', {
+                      method: 'POST',
+                      body: formData,
+                    });
+                    const data = await res.json();
+                    newImageUrls.push(data.secure_url);
+                  }
+
+                  if (editingId) {
+                    // 編輯餐車
+                    setEditData(prev => ({
+                      ...prev,
+                      imageUrls: [...(prev.imageUrls || []), ...newImageUrls],
+                    }));
+                  } else {
+                    // 新增餐車
+                    setNewTruckImageUrls(prev => ({
+                      ...prev,
+                      imageUrls: [...(prev.imageUrls || []), ...newImageUrls],
+                    }));
+                  }
                 }}
-                style={{ marginTop: '5px' }}
+                style={{ marginBottom: '10px' }}
               />
 
-              <div style={{ marginTop: '5px' }}>
-                <button onClick={() => handleSave(truck.id)}>儲存</button>
-                <button onClick={() => setEditingId(null)}>取消</button>
-              </div>
+
+              {editData.imageUrls?.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                  {editData.imageUrls.map((url, index) => (
+                    <div key={index} style={{ position: 'relative' }}>
+                      <img src={url} alt="圖片預覽" width="150" style={{ borderRadius: '8px' }} />
+                      <button
+                        onClick={() =>
+                          setEditData(prev => ({
+                            ...prev,
+                            imageUrls: prev.imageUrls.filter((_, i) => i !== index),
+                          }))
+                        }
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          right: 0,
+                          backgroundColor: 'red',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          cursor: 'pointer',
+                          width: '24px',
+                          height: '24px',
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 圖片預覽與刪除 */}
+              {editData.imageUrls && (
+                <div style={{ marginBottom: '10px' }}>
+                  <img src={editData.imageUrls} alt="預覽圖片" width="200" />
+                  <br />
+                  <button onClick={() => setEditData(prev => ({ ...prev, imageUrls: '' }))}>
+                    刪除圖片
+                  </button>
+                </div>
+              )}
+              <br />
+              <button onClick={() => handleSave(truck.id)}>儲存</button>
+              <button onClick={() => setEditingId(null)}>取消</button>
             </div>
           ) : (
             <>
               <h3>{truck.name}</h3>
               <p>地點：{truck.location}</p>
               <p>類型：{truck.type}</p>
+              <p>平均評分：{getAverageRating(truck.id) ?? '尚無評分'}</p>
 
               <button onClick={() => {
-                setEditingId(truck.id);
-                setEditData({
+                  setEditingId(truck.id);
+                  setEditData({
                   name: truck.name,
                   location: truck.location,
                   type: truck.type,
-                  imageUrl: truck.imageUrl,
-                });
+                    ...truck,
+                    imageUrls: truck.imageUrls || (truck.imageUrls ? [truck.imageUrls] : []), // 向下相容舊資料
+                  });
               }}>編輯</button>
 
               <button onClick={() => handleDelete(truck.id)}>刪除</button>
@@ -421,47 +546,51 @@ function TruckList() {
 
               {/* 評論區 */}
               <div style={{ marginTop: '10px' }}>
-                <strong>平均評分: </strong>
-                {getAverageRating(truck.id) ?? '尚無評分'}
+                <h4>📝 評論區：</h4>
+                {comments[truck.id]?.length > 0 ? (
+                  comments[truck.id].map(comment => (
+                    <div key={comment.id} style={{ borderTop: '1px solid #eee', paddingTop: '5px' }}>
+                      <p><strong>{comment.user || '匿名使用者'}：</strong> {comment.text || comment.comment}</p>
+                      <p>⭐ 評分：{comment.rating || '未提供'}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p>尚無評論。</p>
+                )}
               </div>
 
-              <div>
-                {(comments[truck.id] || []).map(c => (
-                  <div key={c.id} style={{ borderTop: '1px solid #ccc', marginTop: '5px' }}>
-                    <p>⭐ {c.rating}</p>
-                    <p>{c.comment}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* 新增評論 */}
+              {/* 評論區塊 */}
               <div style={{ marginTop: '10px' }}>
+                <h4>新增評論</h4>
                 <input
                   type="number"
                   min="1"
                   max="5"
-                  placeholder="評分 (1~5)"
+                  placeholder="評分（1~5）"
                   value={commentData[truck.id]?.rating || ''}
                   onChange={e => setCommentData(prev => ({
-                    ...prev,
-                    [truck.id]: {
-                      ...prev[truck.id],
-                      rating: e.target.value,
-                    }
-                  }))}
-                  style={{ width: '80px', marginRight: '10px' }}
+                      ...prev,
+                      [truck.id]: {
+                        ...prev[truck.id],
+                        rating: e.target.value
+                      }
+                    }))
+                  }
+                  style={{ width: '100px', marginRight: '10px' }}
                 />
                 <input
                   type="text"
                   placeholder="寫下你的評論"
                   value={commentData[truck.id]?.comment || ''}
                   onChange={e => setCommentData(prev => ({
-                    ...prev,
-                    [truck.id]: {
-                      ...prev[truck.id],
-                      comment: e.target.value,
-                    }
-                  }))}
+                      ...prev,
+                      [truck.id]: {
+                        ...prev[truck.id],
+                        comment: e.target.value
+                      }
+                    }))
+                  }
+                  
                   style={{ width: '300px', marginRight: '10px' }}
                 />
                 <button onClick={() => handleCommentSubmit(truck.id)}>送出評論</button>
@@ -470,6 +599,35 @@ function TruckList() {
           )}
         </div>
       ))}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <img
+            src={previewImage}
+            alt="預覽圖"
+            style={{
+              maxWidth: '90%',
+              maxHeight: '90%',
+              boxShadow: '0 0 20px white',
+              borderRadius: '10px',
+            }}
+          />
+        </div>
+      )}
+
     </div>
   );
 }
