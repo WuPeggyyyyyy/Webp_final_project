@@ -1,100 +1,85 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState } from 'react';
+import { Stack, Button, Typography, CircularProgress } from '@mui/material';
 
-function ImageUploader({ onUploadSuccess }) {
-  const [imageFiles, setImageFiles] = useState([]);
-  const [previewUrls, setPreviewUrls] = useState([]);
+const CLOUD_NAME = 'duij4v2sx';
+const UPLOAD_PRESET = 'CGUfoodtruck_preset';
+const MAX_IMAGES = 4;
+
+const ImageUploader = ({ onUpload }) => {
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadedUrls, setUploadedUrls] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState([]);
+
+  
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files).slice(0, MAX_IMAGES);
+    setSelectedFiles(files);
+  };
 
   const handleUpload = async () => {
-    if (!imageFiles.length) return;
+    if (!selectedFiles.length) return;
     setUploading(true);
+    const urls = [];
 
-    const uploadedUrls = [];
-
-    for (const file of imageFiles) {
+    for (const file of selectedFiles) {
       const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "CGUfoodtruck_preset"); // 替換成你的 preset 名稱
+      formData.append('file', file);
+      formData.append('upload_preset', UPLOAD_PRESET);
 
       try {
-        const res = await axios.post(
-          "https://api.cloudinary.com/v1_1/duij4v2sx/image/upload",
-          formData
-        );
-      const imageUrl = res.data.secure_url;
-      uploadedUrls.push(imageUrl); // 收集所有 URL
+        const res = await fetch(`https://api.cloudinary.com/v1_1/duij4v2sx/image/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        urls.push(data.secure_url);
       } catch (err) {
-        console.error("上傳失敗", err);
-        alert("某張圖片上傳失敗");
+        console.error('Upload failed:', err);
       }
     }
 
-    if (uploadedUrls.length) {
-      setPreviewUrls((prev) => [...prev, ...uploadedUrls]);
-      onUploadSuccess((prev) => [...(Array.isArray(prev) ? prev : []), ...uploadedUrls]);
-    }
-
+    setUploadedUrls(urls);
+    onUpload(urls); // 回傳網址
     setUploading(false);
   };
 
   const handleDeleteImage = (urlToDelete) => {
     setPreviewUrls((prev) => prev.filter((url) => url !== urlToDelete));
-    onUploadSuccess((prev) => prev.filter((url) => url !== urlToDelete));
+    onUpload((prev) => prev.filter((url) => url !== urlToDelete));
   };
 
   return (
-    <div>
+    <Stack spacing={2}>
       <input
         type="file"
         accept="image/*"
         multiple
-        onChange={(e) => setImageFiles(Array.from(e.target.files))}
+        onChange={handleFileChange}
+        disabled={uploading}
       />
-      <button onClick={handleUpload} disabled={uploading}>
-        {uploading ? "上傳中..." : "上傳圖片"}
-      </button>
+      <Button
+        variant="outlined"
+        onClick={handleUpload}
+        disabled={uploading || selectedFiles.length === 0}
+      >
+        {uploading ? <CircularProgress size={20} /> : `上傳 ${selectedFiles.length} 張圖片`}
+      </Button>
 
-      {Array.isArray(previewUrls) && previewUrls.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            overflowX: "auto",
-            paddingTop: "10px",
-          }}
-        >
-          {previewUrls.map((url, index) => (
-            <div key={index} style={{ position: "relative" }}>
-              <img
-                src={url}
-                alt={`圖片${index}`}
-                width="150"
-                style={{ borderRadius: "8px" }}
-              />
-              <button
-                onClick={() => handleDeleteImage(url)}
-                style={{
-                  position: "absolute",
-                  top: "-5px",
-                  right: "-5px",
-                  background: "red",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: "20px",
-                  height: "20px",
-                  cursor: "pointer",
-                }}
-              >
-                ×
-              </button>
-            </div>
+      {uploadedUrls.length > 0 && (
+        <Stack direction="row" spacing={1}>
+          {uploadedUrls.map((url, idx) => (
+            <img
+              key={idx}
+              src={url}
+              alt={`上傳圖片 ${idx + 1}`}
+              style={{ width: 60, height: 60, borderRadius: 8 }}
+            />
           ))}
-        </div>
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
-}
+};
 
 export default ImageUploader;

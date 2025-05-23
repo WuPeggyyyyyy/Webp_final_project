@@ -1,21 +1,28 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { db, storage } from './firebase';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  collection, getDocs, deleteDoc, doc, updateDoc,
-  addDoc, serverTimestamp, query, where, onSnapshot
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+  Box, Card, CardContent, CardActions, Typography, TextField, Button, Stack, Dialog,
+  DialogContent, DialogTitle, DialogActions, Checkbox, FormControlLabel
+} from '@mui/material';
+import { db, storage } from './firebase';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc, doc, where } from 'firebase/firestore';
 
-function TruckList() {
+import EditTruckForm from './EditTruckForm';
+import DeleteTruckForm from './DeleteTruckForm';
+
+function TruckList({ adminPassword }) {
   const [trucks, setTrucks] = useState([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({ name: '', location: '', type: '', imageUrls: [] });
   const [commentData, setCommentData] = useState({});
   const [comments, setComments] = useState({});
-  const [previewImage, setPreviewImage] = useState(null);
+  //const [previewImage, setPreviewImage] = useState(null);
   const [favorites, setFavorites] = useState([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [modalUrl, setModalUrl] = useState(null);
+  const [editingTruck, setEditingTruck] = useState(null);
+  const [deletingTruckId, setDeletingTruckId] = useState(null);
 
   // 新增餐車用狀態
   const [newTruckName, setNewTruckName] = useState('');
@@ -29,16 +36,14 @@ function TruckList() {
 
   // 讀取餐車資料
   useEffect(() => {
-    const fetchData = async () => {
-      const querySnapshot = await getDocs(collection(db, 'trucks'));
-      const items = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setTrucks(items);
-    };
-    fetchData();
+    const q = query(collection(db, 'trucks'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setTrucks(data);
+    });
+    return () => unsubscribe();
   }, []);
+
 
   // 監聽評論
   useEffect(() => {
@@ -77,7 +82,6 @@ function TruckList() {
       }));
       setFavorites(favs);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -105,11 +109,14 @@ function TruckList() {
     setTrucks(updated);
   };
 
-  // 過濾搜尋結果
-  const filtered = trucks.filter(truck => {
-    const matchSearch = truck.name.toLowerCase().includes(search.toLowerCase());
-    const matchFavorite = !showFavoritesOnly || favorites.some(fav => fav.truckId === truck.id);
-    return matchSearch && matchFavorite;
+  const handleCommentChange = (id, value) => {
+    setCommentData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const filteredTrucks = trucks.filter((truck) => {
+    const match = truck.name.toLowerCase().includes(search.toLowerCase());
+    const fav = showFavoritesOnly ? favorites.includes(truck.id) : true;
+    return match && fav;
   });
 
   // 評分系統 - 新增評論
@@ -235,7 +242,7 @@ function TruckList() {
         name: newTruckName,
         location: newTruckLocation,
         type: newTruckType,
-        imageUrls: downloadUrl,
+        imageUrls: [downloadUrl],
         createdAt: serverTimestamp(),
       });
 
@@ -247,8 +254,7 @@ function TruckList() {
           name: newTruckName,
           location: newTruckLocation,
           type: newTruckType,
-          imageUrls: downloadUrl,
-          imageUrls: newTruckImageUrls,
+          imageUrls: [downloadUrl],
         }
       ]);
 
@@ -275,360 +281,110 @@ function TruckList() {
   };
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2>新增餐車</h2>
-      <div style={{ marginBottom: '1rem' }}>
-        <input
-          type="text"
-          placeholder="餐車名稱"
-          value={newTruckName}
-          onChange={e => setNewTruckName(e.target.value)}
-          style={{ marginRight: '10px', padding: '0.5rem' }}
-        />
-
-        {/* 地點下拉 */}
-        <select
-          value={newTruckLocation}
-          onChange={e => setNewTruckLocation(e.target.value)}
-          style={{ marginRight: '10px', padding: '0.5rem' }}
-        >
-          <option>管理大樓</option>
-          <option>工學大樓</option>
-          <option>明德樓</option>
-          <option>藴德樓</option>
-        </select>
-
-        {/* 類型下拉 */}
-        <select
-          value={newTruckType}
-          onChange={e => setNewTruckType(e.target.value)}
-          style={{ marginRight: '10px', padding: '0.5rem' }}
-        >
-          <option>小吃</option>
-          <option>中式料理</option>
-          <option>日式料理</option>
-          <option>韓式料理</option>
-          <option>西式料理</option>
-          <option>素食</option>
-          <option>甜點／甜品</option>
-          <option>飲料／咖啡</option>
-          <option>麵食</option>
-          <option>海鮮</option>
-          <option>烤肉／燒烤</option>
-          <option>速食</option>
-          <option>早餐</option>
-          <option>其他</option>
-        </select>
-      </div>
-
-      {/* 圖片上傳及 Canvas 顯示 */}
-      <div style={{ marginBottom: '1rem' }}>
-        <input type="file" accept="image/*" onChange={handleNewImageChange} />
-      </div>
-      <canvas ref={canvasRef} style={{ maxWidth: '300px', border: '1px solid #ccc', marginBottom: '1rem' }} />
-
-      <button onClick={handleAddTruck} style={{ padding: '0.5rem 1rem' }}>新增餐車</button>
-
-      <hr style={{ margin: '2rem 0' }} />
-
-      <h2>目前餐車列表</h2>
-
-      {/* 搜尋框 */}
-      <input
-        type="text"
-        placeholder="搜尋餐車名稱"
+    <Box>
+      <TextField
+        label="搜尋餐車"
+        fullWidth
         value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{ marginBottom: '1rem', padding: '0.5rem', width: '300px' }}
+        onChange={(e) => setSearch(e.target.value)}
+        sx={{ mb: 2 }}
       />
 
-      {/* 收藏篩選器 */}
-      <label style={{ display: 'block', marginBottom: '1rem' }}>
-        <input
-          type="checkbox"
-          checked={showFavoritesOnly}
-          onChange={() => setShowFavoritesOnly(prev => !prev)}
-          style={{ marginRight: '5px' }}
-        />
-        只顯示我收藏的餐車
-      </label>
-
-      {filtered.map(truck => (
-        <div
-          key={truck.id}
-          style={{
-            border: '1px solid #ccc',
-            margin: '10px',
-            padding: '10px',
-          }}
-        >
-          <img
-            src={truck.imageUrls}
-            alt={truck.name}
-            width="200"
-            style={{ marginBottom: '10px', cursor: 'pointer' }}
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={showFavoritesOnly}
+            onChange={() => setShowFavoritesOnly(!showFavoritesOnly)}
           />
+        }
+        label="只看我的收藏"
+        sx={{ mb: 2 }}
+      />
 
-          {truck.imageUrls?.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                overflowX: 'auto',
-                gap: '10px',
-                marginBottom: '10px',
-                paddingBottom: '5px',
-              }}
-            >
-              {truck.imageUrls.map((url, index) => (
-                <img
-                  key={index}
-                  src={url}
-                  alt={`餐車圖片-${index}`}
-                  width="150"
-                  style={{ borderRadius: '8px', cursor: 'pointer' }}
-                  onClick={() => setPreviewImage(url)}
-                />
-              ))}
-            </div>
-          )}
+      <Stack spacing={2}>
+        {filteredTrucks.map((truck) => (
+          <Card key={truck.id}>
+            <CardContent>
+              <Typography variant="h6">{truck.name}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                類型：{truck.type} / 地點：{truck.location}
+              </Typography>
 
-          {editingId === truck.id ? (
-            <div>
-              <input
-                value={editData.name}
-                onChange={e =>
-                  setEditData({ ...editData, name: e.target.value })
-                }
-                placeholder="餐車名稱"
-              />
-              <select
-                value={editData.location}
-                onChange={e =>
-                  setEditData({ ...editData, location: e.target.value })
-                }
-              >
-                <option>管理大樓</option>
-                <option>工學大樓</option>
-                <option>明德樓</option>
-                <option>藴德樓</option>
-              </select>
-              <select
-                value={editData.type}
-                onChange={e =>
-                  setEditData({ ...editData, type: e.target.value })
-                }
-              >
-                <option>小吃</option>
-                <option>中式料理</option>
-                <option>日式料理</option>
-                <option>韓式料理</option>
-                <option>西式料理</option>
-                <option>素食</option>
-                <option>甜點／甜品</option>
-                <option>飲料／咖啡</option>
-                <option>麵食</option>
-                <option>海鮮</option>
-                <option>烤肉／燒烤</option>
-                <option>速食</option>
-                <option>早餐</option>
-                <option>其他</option>
-              </select>
-
-              {/* 編輯時可更換圖片 */}
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={async (e) => {
-                  const files = Array.from(e.target.files);
-                  const newImageUrls = [];
-
-                  for (const file of files) {
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('upload_preset', 'CGUfoodtruck_preset');
-
-                    const res = await fetch('https://api.cloudinary.com/v1_1/duij4v2sx/image/upload', {
-                      method: 'POST',
-                      body: formData,
-                    });
-                    const data = await res.json();
-                    newImageUrls.push(data.secure_url);
-                  }
-
-                  if (editingId) {
-                    // 編輯餐車
-                    setEditData(prev => ({
-                      ...prev,
-                      imageUrls: [...(prev.imageUrls || []), ...newImageUrls],
-                    }));
-                  } else {
-                    // 新增餐車
-                    setNewTruckImageUrls(prev => ({
-                      ...prev,
-                      imageUrls: [...(prev.imageUrls || []), ...newImageUrls],
-                    }));
-                  }
-                }}
-                style={{ marginBottom: '10px' }}
-              />
-
-
-              {editData.imageUrls?.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
-                  {editData.imageUrls.map((url, index) => (
-                    <div key={index} style={{ position: 'relative' }}>
-                      <img src={url} alt="圖片預覽" width="150" style={{ borderRadius: '8px' }} />
-                      <button
-                        onClick={() =>
-                          setEditData(prev => ({
-                            ...prev,
-                            imageUrls: prev.imageUrls.filter((_, i) => i !== index),
-                          }))
-                        }
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          right: 0,
-                          backgroundColor: 'red',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '50%',
-                          cursor: 'pointer',
-                          width: '24px',
-                          height: '24px',
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
+              {truck.imageUrls?.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  {truck.imageUrls.map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={`圖${idx + 1}`}
+                      style={{
+                        width: 80,
+                        height: 80,
+                        objectFit: 'cover',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => setModalUrl(url)}
+                    />
                   ))}
-                </div>
+                </Stack>
               )}
+            </CardContent>
 
-              {/* 圖片預覽與刪除 */}
-              {editData.imageUrls && (
-                <div style={{ marginBottom: '10px' }}>
-                  <img src={editData.imageUrls} alt="預覽圖片" width="200" />
-                  <br />
-                  <button onClick={() => setEditData(prev => ({ ...prev, imageUrls: '' }))}>
-                    刪除圖片
-                  </button>
-                </div>
-              )}
-              <br />
-              <button onClick={() => handleSave(truck.id)}>儲存</button>
-              <button onClick={() => setEditingId(null)}>取消</button>
-            </div>
-          ) : (
-            <>
-              <h3>{truck.name}</h3>
-              <p>地點：{truck.location}</p>
-              <p>類型：{truck.type}</p>
-              <p>平均評分：{getAverageRating(truck.id) ?? '尚無評分'}</p>
+            <CardActions>
+              <Button onClick={() => setEditingTruck(truck)} color="primary">編輯</Button>
+              <Button onClick={() => setDeletingTruckId(truck.id)} color="error">刪除</Button>
+              <Button onClick={() => toggleFavorite(truck.id)} color="secondary">
+                {favorites.includes(truck.id) ? '💖 取消收藏' : '🤍 收藏'}
+              </Button>
+            </CardActions>
 
-              <button onClick={() => {
-                  setEditingId(truck.id);
-                  setEditData({
-                  name: truck.name,
-                  location: truck.location,
-                  type: truck.type,
-                    ...truck,
-                    imageUrls: truck.imageUrls || (truck.imageUrls ? [truck.imageUrls] : []), // 向下相容舊資料
-                  });
-              }}>編輯</button>
+            <Box sx={{ px: 2, pb: 2 }}>
+              <TextField
+                label="留言"
+                value={commentData[truck.id] || ''}
+                onChange={(e) => handleCommentChange(truck.id, e.target.value)}
+                fullWidth
+                size="small"
+              />
+              <Button
+                variant="outlined"
+                onClick={() => handleCommentSubmit(truck.id)}
+                sx={{ mt: 1 }}
+              >
+                送出留言
+              </Button>
+            </Box>
+          </Card>
+        ))}
+      </Stack>
 
-              <button onClick={() => handleDelete(truck.id)}>刪除</button>
+      {/* 預覽圖片 */}
+      <Dialog open={Boolean(modalUrl)} onClose={() => setModalUrl(null)} maxWidth="md">
+        <DialogContent sx={{ p: 0 }}>
+          <img src={modalUrl} alt="預覽" style={{ width: '100%', height: 'auto' }} />
+        </DialogContent>
+      </Dialog>
 
-              <button onClick={() => toggleFavorite(truck.id)}>
-                {isFavorite(truck.id) ? '取消收藏' : '收藏'}
-              </button>
-
-              {/* 評論區 */}
-              <div style={{ marginTop: '10px' }}>
-                <h4>📝 評論區：</h4>
-                {comments[truck.id]?.length > 0 ? (
-                  comments[truck.id].map(comment => (
-                    <div key={comment.id} style={{ borderTop: '1px solid #eee', paddingTop: '5px' }}>
-                      <p><strong>{comment.user || '匿名使用者'}：</strong> {comment.text || comment.comment}</p>
-                      <p>⭐ 評分：{comment.rating || '未提供'}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p>尚無評論。</p>
-                )}
-              </div>
-
-              {/* 評論區塊 */}
-              <div style={{ marginTop: '10px' }}>
-                <h4>新增評論</h4>
-                <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  placeholder="評分（1~5）"
-                  value={commentData[truck.id]?.rating || ''}
-                  onChange={e => setCommentData(prev => ({
-                      ...prev,
-                      [truck.id]: {
-                        ...prev[truck.id],
-                        rating: e.target.value
-                      }
-                    }))
-                  }
-                  style={{ width: '100px', marginRight: '10px' }}
-                />
-                <input
-                  type="text"
-                  placeholder="寫下你的評論"
-                  value={commentData[truck.id]?.comment || ''}
-                  onChange={e => setCommentData(prev => ({
-                      ...prev,
-                      [truck.id]: {
-                        ...prev[truck.id],
-                        comment: e.target.value
-                      }
-                    }))
-                  }
-                  
-                  style={{ width: '300px', marginRight: '10px' }}
-                />
-                <button onClick={() => handleCommentSubmit(truck.id)}>送出評論</button>
-              </div>
-            </>
-          )}
-        </div>
-      ))}
-      {previewImage && (
-        <div
-          onClick={() => setPreviewImage(null)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-          }}
-        >
-          <img
-            src={previewImage}
-            alt="預覽圖"
-            style={{
-              maxWidth: '90%',
-              maxHeight: '90%',
-              boxShadow: '0 0 20px white',
-              borderRadius: '10px',
-            }}
-          />
-        </div>
+      {/* 編輯 Dialog */}
+      {editingTruck && (
+        <EditTruckForm
+          truck={editingTruck}
+          onClose={() => setEditingTruck(null)}
+          onSave={handleSave}
+          adminPassword={adminPassword}
+        />
       )}
 
-    </div>
+      {/* 刪除 Dialog */}
+      {deletingTruckId && (
+        <DeleteTruckForm
+          truckId={deletingTruckId}
+          onClose={() => setDeletingTruckId(null)}
+          adminPassword={adminPassword}
+        />
+      )}
+    </Box>
   );
 }
 
