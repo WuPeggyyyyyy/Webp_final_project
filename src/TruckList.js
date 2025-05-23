@@ -28,8 +28,8 @@ function TruckList({ adminPassword }) {
   const [newTruckName, setNewTruckName] = useState('');
   const [newTruckLocation, setNewTruckLocation] = useState('管理大樓');
   const [newTruckType, setNewTruckType] = useState('小吃');
-  const [newTruckImageFile, setNewTruckImageFile] = useState(null);
-  const [newTruckImagePreview, setNewTruckImagePreview] = useState(null);
+  const [newTruckImageFiles, setNewTruckImageFiles] = useState([]);
+  const [newTruckImagePreviews, setNewTruckImagePreviews] = useState([]);
   const [newTruckImageUrls, setNewTruckImageUrls] = useState({});
 
   const canvasRef = useRef(null);
@@ -183,26 +183,22 @@ function TruckList({ adminPassword }) {
 
   // 新增餐車 - 圖片檔案選擇後顯示預覽（Canvas）
   const handleNewImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setNewTruckImageFile(file);
+    const files = Array.from(e.target.files).slice(0, 4);
+    if (!files) return;
+    setNewTruckImageFiles(files);
 
+    const previews = [];
+  files.forEach((file) => {
     const reader = new FileReader();
     reader.onload = function (event) {
-      const img = new Image();
-      img.onload = function () {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        // 調整 canvas 大小跟圖片一樣
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+      previews.push(event.target.result);
+      if (previews.length === files.length) {
+        setNewTruckImagePreviews(previews); // 顯示預覽圖
+      }
       };
-      img.src = event.target.result;
-    };
+    
     reader.readAsDataURL(file);
+  });
   };
 
   // 新增餐車 - 上傳圖片到 Firebase Storage 並新增資料
@@ -211,7 +207,7 @@ function TruckList({ adminPassword }) {
       alert('請輸入餐車名稱');
       return;
     }
-    if (!newTruckImageFile) {
+    if (!newTruckImageFiles) {
       alert('請選擇餐車圖片');
       return;
     }
@@ -232,9 +228,9 @@ function TruckList({ adminPassword }) {
 
 
     // 上傳圖片到 Storage
-    const storageRef = ref(storage, `trucks/${Date.now()}_${newTruckImageFile.name}`);
+    const storageRef = ref(storage, `trucks/${Date.now()}_${newTruckImageFiles.name}`);
     try {
-      await uploadBytes(storageRef, newTruckImageFile);
+      await uploadBytes(storageRef, newTruckImageFiles);
       const downloadUrl = await getDownloadURL(storageRef);
 
       // 新增 Firestore 文件
@@ -262,7 +258,7 @@ function TruckList({ adminPassword }) {
       setNewTruckName('');
       setNewTruckLocation('管理大樓');
       setNewTruckType('小吃');
-      setNewTruckImageFile(null);
+      setNewTruckImageFiles(null);
       setNewTruckImageUrls([]);
 
       // 清空畫布
@@ -335,7 +331,7 @@ function TruckList({ adminPassword }) {
               <Button onClick={() => setEditingTruck(truck)} color="primary">編輯</Button>
               <Button onClick={() => setDeletingTruckId(truck.id)} color="error">刪除</Button>
               <Button onClick={() => toggleFavorite(truck.id)} color="secondary">
-                {favorites.includes(truck.id) ? '💖 取消收藏' : '🤍 收藏'}
+                {isFavorite(truck.id) ? '💔 取消收藏' : '🤍 收藏'}
               </Button>
             </CardActions>
 
