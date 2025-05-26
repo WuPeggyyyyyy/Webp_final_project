@@ -115,7 +115,7 @@ function TruckList({ adminPassword }) {
 
   const filteredTrucks = trucks.filter((truck) => {
     const match = truck.name.toLowerCase().includes(search.toLowerCase());
-    const fav = showFavoritesOnly ? favorites.includes(truck.id) : true;
+    const fav = showFavoritesOnly ? favorites.some(fav => fav.truckId === truck.id) : true;
     return match && fav;
   });
 

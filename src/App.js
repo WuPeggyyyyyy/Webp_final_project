@@ -12,7 +12,10 @@ import SettingsIcon from '@mui/icons-material/Settings';
 
 function App() {
   const [openAddForm, setOpenAddForm] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    const storedMode = localStorage.getItem('darkMode');
+    return storedMode === null ? false : storedMode === 'true';
+  });
   const [adminPassword, setAdminPassword] = useState('0000');
   const [editPwdOpen, setEditPwdOpen] = useState(false);
   const [currentPwd, setCurrentPwd] = useState('');
@@ -29,7 +32,13 @@ function App() {
 
   const handleOpenAdd = () => setOpenAddForm(true);
   const handleCloseAdd = () => setOpenAddForm(false);
-  const toggleTheme = () => setDarkMode(prev => !prev);
+  const toggleTheme = () => {
+    setDarkMode(prev => {
+      const newMode = !prev;
+      localStorage.setItem('darkMode', newMode);
+      return newMode;
+    });
+  };
 
   const handleOpenPwdDialog = () => setEditPwdOpen(true);
   const handleClosePwdDialog = () => {
