@@ -1,32 +1,45 @@
 import React from 'react';
+import { TextField, Box } from '@mui/material';
 
 const TruckFormFields = ({ formData, handleChange }) => (
-  <>
-    <input
-      type="text"
+  <Box mt={2}>
+    <TextField
+      label="餐車名稱"
       name="name"
-      placeholder="餐車名稱"
       value={formData.name}
       onChange={handleChange}
       required
+      fullWidth
+      margin="normal"
+      variant="filled"
+      size="small"
+      InputLabelProps={{ shrink: true, style: { color: '#e0e0e0' } }}
     />
-    <input
-      type="text"
+    <TextField
+      label="餐車類型"
       name="type"
-      placeholder="餐車類型"
       value={formData.type}
       onChange={handleChange}
       required
+      fullWidth
+      margin="normal"
+      variant="filled"
+      size="small"
+      InputLabelProps={{ shrink: true, style: { color: '#e0e0e0' } }}
     />
-    <input
-      type="text"
+    <TextField
+      label="地點"
       name="location"
-      placeholder="地點"
       value={formData.location}
       onChange={handleChange}
       required
+      fullWidth
+      margin="normal"
+      variant="filled"
+      size="small"
+      InputLabelProps={{ shrink: true, style: { color: '#e0e0e0' } }}
     />
-  </>
+  </Box>
 );
 
 export default TruckFormFields;
