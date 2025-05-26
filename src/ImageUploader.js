@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { Stack, Button, Typography, CircularProgress } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 
 const CLOUD_NAME = 'duij4v2sx';
 const UPLOAD_PRESET = 'CGUfoodtruck_preset';
 const MAX_IMAGES = 4;
 
 const ImageUploader = ({ onUpload }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const textColor = isDark ? '#e0e0e0' : '#000000';
+
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadedUrls, setUploadedUrls] = useState([]);
-  const [previewUrls, setPreviewUrls] = useState([]);
 
-  
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files).slice(0, MAX_IMAGES);
     setSelectedFiles(files);
@@ -28,7 +31,7 @@ const ImageUploader = ({ onUpload }) => {
       formData.append('upload_preset', UPLOAD_PRESET);
 
       try {
-        const res = await fetch(`https://api.cloudinary.com/v1_1/duij4v2sx/image/upload`, {
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -40,24 +43,28 @@ const ImageUploader = ({ onUpload }) => {
     }
 
     setUploadedUrls(urls);
-    onUpload(urls); // 回傳網址
+    onUpload(urls);
     setUploading(false);
-  };
-
-  const handleDeleteImage = (urlToDelete) => {
-    setPreviewUrls((prev) => prev.filter((url) => url !== urlToDelete));
-    onUpload((prev) => prev.filter((url) => url !== urlToDelete));
   };
 
   return (
     <Stack spacing={2}>
-      <input
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={handleFileChange}
-        disabled={uploading}
-      />
+      <Typography variant="subtitle1" sx={{ color: textColor }}>
+        圖片上傳
+      </Typography>
+
+      <Button variant="contained" component="label" color="warning">
+        選擇圖片
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={handleFileChange}
+          disabled={uploading}
+        />
+      </Button>
+
       <Button
         variant="outlined"
         onClick={handleUpload}

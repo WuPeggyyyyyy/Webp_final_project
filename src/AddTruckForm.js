@@ -4,9 +4,10 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import ImageUploader from './ImageUploader';
 import { verifyAdminPassword } from './useAdminAuth';
 import TruckFormFields from './TruckFormFields';
+import AdminPasswordInput from './AdminPasswordInput';
 
 import {
-  TextField, Button, Stack, Dialog, DialogTitle, DialogActions, DialogContent
+  Button, Stack, Dialog, DialogTitle, DialogActions, DialogContent
 } from '@mui/material';
 
 const AddTruckForm = ({ onClose, adminPassword }) => {
@@ -69,14 +70,7 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>確認新增？</DialogTitle>
         <DialogContent>
-          <TextField
-            label="請輸入管理員密碼"
-            type="password"
-            fullWidth
-            sx={{ mt: 1 }}
-            value={inputPwd}
-            onChange={(e) => setInputPwd(e.target.value)}
-          />
+          <AdminPasswordInput onPasswordSubmit={(pwd) => setInputPwd(pwd)} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>取消</Button>
