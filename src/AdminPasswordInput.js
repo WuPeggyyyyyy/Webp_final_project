@@ -1,9 +1,10 @@
+// AdminPasswordInput.js
 import React, { useState, useRef } from 'react';
 import {
   Box, TextField, Button, Typography, Fade, Paper
 } from '@mui/material';
 
-const AdminPasswordInput = ({ onSubmit, correctPassword }) => {
+const AdminPasswordInput = ({ onPasswordSubmit, onSubmit }) => {
   const [inputPwd, setInputPwd] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(false);
@@ -22,13 +23,13 @@ const AdminPasswordInput = ({ onSubmit, correctPassword }) => {
   const handleClick = () => {
     if (inputPwd.trim() === '') return;
 
-    if (inputPwd !== correctPassword) {
-      alert('密碼錯誤');
-      return;
+    // 直接傳遞密碼給父元件，讓父元件自己驗證
+    if (onPasswordSubmit) {
+      onPasswordSubmit(inputPwd);
     }
 
     setSubmitted(true);
-    onSubmit(); // 呼叫上層邏輯（如刪除、送出等）
+    if (onSubmit) onSubmit();
   };
 
   const handleReset = () => {
@@ -71,7 +72,6 @@ const AdminPasswordInput = ({ onSubmit, correctPassword }) => {
         </Box>
       </Box>
 
-      {/* 遮罩動畫 */}
       <Fade in={submitted}>
         <Paper
           onClick={handleReset}
@@ -90,7 +90,7 @@ const AdminPasswordInput = ({ onSubmit, correctPassword }) => {
             cursor: 'pointer',
           }}
         >
-          <Typography variant="h6">表單已送出！(*´∀`)~♥</Typography>
+          <Typography variant="h6">表單已送出！(´∀`)~♥</Typography>
           <Typography variant="body2">點一下再來一次</Typography>
         </Paper>
       </Fade>

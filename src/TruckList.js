@@ -1,30 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Box, Card, CardContent, CardActions, Typography, TextField, Button, Stack, Dialog,
-  DialogContent, DialogTitle, DialogActions, Checkbox, FormControlLabel
+  DialogContent, DialogTitle, DialogActions, Checkbox, FormControlLabel, Rating,
+  Divider, Avatar, Paper, Grid, Chip
 } from '@mui/material';
 import { db, storage } from './firebase';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, updateDoc, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 
 import EditTruckForm from './EditTruckForm';
 import DeleteTruckForm from './DeleteTruckForm';
+import TodaySchedule from './TodaySchedule';
+
 
 function TruckList({ adminPassword }) {
   const [trucks, setTrucks] = useState([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({ name: '', location: '', type: '', imageUrls: [] });
+  
+  // 修正評論資料結構
   const [commentData, setCommentData] = useState({});
   const [comments, setComments] = useState({});
-  //const [previewImage, setPreviewImage] = useState(null);
+  
   const [favorites, setFavorites] = useState([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [modalUrl, setModalUrl] = useState(null);
   const [editingTruck, setEditingTruck] = useState(null);
   const [deletingTruckId, setDeletingTruckId] = useState(null);
 
-  // 新增餐車用狀態
+  // 新增今日時間表狀態
+  const [todaySchedule, setTodaySchedule] = useState({});
+
+  // 其他狀態保持不變...
   const [newTruckName, setNewTruckName] = useState('');
   const [newTruckLocation, setNewTruckLocation] = useState('管理大樓');
   const [newTruckType, setNewTruckType] = useState('小吃');
@@ -44,32 +52,31 @@ function TruckList({ adminPassword }) {
     return () => unsubscribe();
   }, []);
 
-
   // 監聽評論
   useEffect(() => {
-  const unsubscribeFns = [];
+    const unsubscribeFns = [];
 
-  const fetchComments = async () => {
-    trucks.forEach(truck => {
-      const reviewsRef = collection(db, 'trucks', truck.id, 'reviews');
+    const fetchComments = async () => {
+      trucks.forEach(truck => {
+        const reviewsRef = collection(db, 'trucks', truck.id, 'reviews');
 
-      const unsubscribe = onSnapshot(reviewsRef, snapshot => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setComments(prev => ({ ...prev, [truck.id]: data }));
+        const unsubscribe = onSnapshot(reviewsRef, snapshot => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setComments(prev => ({ ...prev, [truck.id]: data }));
+        });
+
+        unsubscribeFns.push(unsubscribe);
       });
+    };
 
-      unsubscribeFns.push(unsubscribe);
-    });
-  };
+    if (trucks.length > 0) fetchComments();
 
-  if (trucks.length > 0) fetchComments();
-
-  return () => {
-    unsubscribeFns.forEach(unsub => unsub());
-  };
+    return () => {
+      unsubscribeFns.forEach(unsub => unsub());
+    };
   }, [trucks]);
 
   // 監聽收藏餐車
@@ -85,32 +92,15 @@ function TruckList({ adminPassword }) {
     return () => unsubscribe();
   }, []);
 
-  // 刪除餐車
-  const handleDelete = async (id) => {
-    if (window.confirm('確定要刪除這筆餐車資料嗎？')) {
-      await deleteDoc(doc(db, 'trucks', id));
-      setTrucks(trucks.filter(truck => truck.id !== id));
-    }
-  };
-
-  // 儲存編輯後資料
-  const handleSave = async (id) => {
-    const refDoc = doc(db, 'trucks', id);
-    await updateDoc(refDoc, {
-      name: editData.name,
-      location: editData.location,
-      type: editData.type,
-      imageUrls: editData.imageUrls,
-    });
-    setEditingId(null);
-    const updated = trucks.map(t =>
-      t.id === id ? { ...t, ...editData } : t
-    );
-    setTrucks(updated);
-  };
-
-  const handleCommentChange = (id, value) => {
-    setCommentData(prev => ({ ...prev, [id]: value }));
+  // 修正評論輸入處理
+  const handleCommentChange = (truckId, field, value) => {
+    setCommentData(prev => ({
+      ...prev,
+      [truckId]: {
+        ...prev[truckId],
+        [field]: value
+      }
+    }));
   };
 
   const filteredTrucks = trucks.filter((truck) => {
@@ -119,48 +109,42 @@ function TruckList({ adminPassword }) {
     return match && fav;
   });
 
-  // 評分系統 - 新增評論
+  // 修正評論提交函式
   const handleCommentSubmit = async (truckId) => {
-  if (!commentData[truckId]?.comment || !commentData[truckId]?.rating) {
-    alert('請輸入評分與評論內容');
-    return;
-  }
+    const data = commentData[truckId];
+    if (!data?.comment || !data?.rating) {
+      alert('請輸入評分與評論內容');
+      return;
+    }
 
-  // 檢查評分範圍
-  await addDoc(collection(db, 'trucks', truckId, 'reviews'), {
-    userId: 'demo-user', // 之後接入 Firebase Auth 再改為動態值
-    rating: Number(commentData[truckId].rating),
-    comment: commentData[truckId].comment,
-    timestamp: serverTimestamp(),
-  });
+    try {
+      await addDoc(collection(db, 'trucks', truckId, 'reviews'), {
+        userId: 'demo-user',
+        rating: Number(data.rating),
+        comment: data.comment,
+        timestamp: serverTimestamp(),
+      });
 
-  // 清空評論欄位
-  setCommentData(prev => ({ ...prev, [truckId]: { rating: '', comment: '' } }));
-  alert('評論成功！');
+      // 清空評論欄位
+      setCommentData(prev => ({ 
+        ...prev, 
+        [truckId]: { rating: 0, comment: '' } 
+      }));
+      alert('評論成功！');
+    } catch (error) {
+      console.error('評論提交失敗:', error);
+      alert('評論提交失敗，請再試一次');
+    }
   };
 
   // 計算平均評分
   const getAverageRating = (truckId) => {
-  const truckComments = comments[truckId];
-  if (!truckComments || truckComments.length === 0) return null;
+    const truckComments = comments[truckId];
+    if (!truckComments || truckComments.length === 0) return 0;
 
-  const total = truckComments.reduce((sum, c) => sum + (c.rating || 0), 0);
+    const total = truckComments.reduce((sum, c) => sum + (c.rating || 0), 0);
     return (total / truckComments.length).toFixed(1);
   };
-
-  // 收藏餐車
-  useEffect(() => {
-    const q = query(collection(db, 'favorites'), where('userId', '==', 'demo-user'));
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const favs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setFavorites(favs);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   const isFavorite = (truckId) => {
     return favorites.some(fav => fav.truckId === truckId);
@@ -170,38 +154,47 @@ function TruckList({ adminPassword }) {
   const toggleFavorite = async (truckId) => {
     const existing = favorites.find(fav => fav.truckId === truckId);
     if (existing) {
-      // 已收藏，取消
       await deleteDoc(doc(db, 'favorites', existing.id));
     } else {
-      // 尚未收藏，新增
       await addDoc(collection(db, 'favorites'), {
-        userId: 'demo-user', // 之後用 Firebase Auth 替換
+        userId: 'demo-user',
         truckId,
       });
     }
   };
 
-  // 新增餐車 - 圖片檔案選擇後顯示預覽（Canvas）
+  // 格式化時間
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('zh-TW', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // 其他函式保持不變...
   const handleNewImageChange = (e) => {
     const files = Array.from(e.target.files).slice(0, 4);
     if (!files) return;
     setNewTruckImageFiles(files);
 
     const previews = [];
-  files.forEach((file) => {
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      previews.push(event.target.result);
-      if (previews.length === files.length) {
-        setNewTruckImagePreviews(previews); // 顯示預覽圖
-      }
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        previews.push(event.target.result);
+        if (previews.length === files.length) {
+          setNewTruckImagePreviews(previews);
+        }
       };
-    
-    reader.readAsDataURL(file);
-  });
+      reader.readAsDataURL(file);
+    });
   };
 
-  // 新增餐車 - 上傳圖片到 Firebase Storage 並新增資料
   const handleAddTruck = async () => {
     if (!newTruckName.trim()) {
       alert('請輸入餐車名稱');
@@ -212,28 +205,11 @@ function TruckList({ adminPassword }) {
       return;
     }
 
-    const handleAddImageUrls = (truckId, imageUrls) => {
-      setNewTruckImageUrls((prev) => ({
-        ...prev,
-        [truckId]: [...(prev[truckId] || []), imageUrls],
-      }));
-    };
-
-    const handleDeleteImage = (truckId, indexToDelete) => {
-      setNewTruckImageUrls((prev) => ({
-        ...prev,
-        [truckId]: prev[truckId].filter((_, index) => index !== indexToDelete),
-      }));
-    };
-
-
-    // 上傳圖片到 Storage
     const storageRef = ref(storage, `trucks/${Date.now()}_${newTruckImageFiles.name}`);
     try {
       await uploadBytes(storageRef, newTruckImageFiles);
       const downloadUrl = await getDownloadURL(storageRef);
 
-      // 新增 Firestore 文件
       const docRef = await addDoc(collection(db, 'trucks'), {
         name: newTruckName,
         location: newTruckLocation,
@@ -242,7 +218,6 @@ function TruckList({ adminPassword }) {
         createdAt: serverTimestamp(),
       });
 
-      // 更新本地狀態
       setTrucks(prev => [
         ...prev,
         {
@@ -254,14 +229,12 @@ function TruckList({ adminPassword }) {
         }
       ]);
 
-      // 清空表單
       setNewTruckName('');
       setNewTruckLocation('管理大樓');
       setNewTruckType('小吃');
       setNewTruckImageFiles(null);
       setNewTruckImageUrls([]);
 
-      // 清空畫布
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
@@ -269,7 +242,6 @@ function TruckList({ adminPassword }) {
       }
 
       alert('新增餐車成功！');
-
     } catch (error) {
       alert('圖片上傳失敗，請再試一次');
       console.error(error);
@@ -297,11 +269,23 @@ function TruckList({ adminPassword }) {
         sx={{ mb: 2 }}
       />
 
+      {/* 使用獨立的今日時間表元件 */}
+      <TodaySchedule />
+
       <Stack spacing={2}>
         {filteredTrucks.map((truck) => (
           <Card key={truck.id}>
             <CardContent>
-              <Typography variant="h6">{truck.name}</Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">{truck.name}</Typography>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Rating value={Number(getAverageRating(truck.id))} readOnly precision={0.1} />
+                  <Typography variant="body2" color="text.secondary">
+                    ({getAverageRating(truck.id)})
+                  </Typography>
+                </Box>
+              </Box>
+              
               <Typography variant="body2" color="text.secondary">
                 類型：{truck.type} / 地點：{truck.location}
               </Typography>
@@ -335,21 +319,78 @@ function TruckList({ adminPassword }) {
               </Button>
             </CardActions>
 
+            {/* 評論輸入區域 */}
             <Box sx={{ px: 2, pb: 2 }}>
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle2" gutterBottom>
+                新增評論
+              </Typography>
+              
+              <Box sx={{ mb: 2 }}>
+                <Typography component="legend">評分</Typography>
+                <Rating
+                  value={commentData[truck.id]?.rating || 0}
+                  onChange={(event, newValue) => {
+                    handleCommentChange(truck.id, 'rating', newValue);
+                  }}
+                />
+              </Box>
+
               <TextField
-                label="留言"
-                value={commentData[truck.id] || ''}
-                onChange={(e) => handleCommentChange(truck.id, e.target.value)}
+                label="留言內容"
+                value={commentData[truck.id]?.comment || ''}
+                onChange={(e) => handleCommentChange(truck.id, 'comment', e.target.value)}
                 fullWidth
+                multiline
+                rows={2}
                 size="small"
+                sx={{ mb: 1 }}
               />
+              
               <Button
                 variant="outlined"
                 onClick={() => handleCommentSubmit(truck.id)}
-                sx={{ mt: 1 }}
+                size="small"
               >
-                送出留言
+                送出評論
               </Button>
+
+              {/* 顯示現有評論 */}
+              {comments[truck.id] && comments[truck.id].length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    評論 ({comments[truck.id].length})
+                  </Typography>
+                  
+                  <Stack spacing={2}>
+                    {comments[truck.id].map((comment) => (
+                      <Box key={comment.id} sx={{ 
+                        p: 2, 
+                        backgroundColor: 'background.paper',
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider'
+                      }}>
+                        <Box display="flex" alignItems="center" gap={1} mb={1}>
+                          <Avatar sx={{ width: 24, height: 24 }}>
+                            {comment.userId.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Typography variant="body2" fontWeight="bold">
+                            {comment.userId}
+                          </Typography>
+                          <Rating value={comment.rating} readOnly size="small" />
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDate(comment.timestamp)}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2">
+                          {comment.comment}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
             </Box>
           </Card>
         ))}
@@ -367,7 +408,6 @@ function TruckList({ adminPassword }) {
         <EditTruckForm
           truck={editingTruck}
           onClose={() => setEditingTruck(null)}
-          onSave={handleSave}
           adminPassword={adminPassword}
         />
       )}

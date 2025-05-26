@@ -4,10 +4,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import ImageUploader from './ImageUploader';
 import { verifyAdminPassword } from './useAdminAuth';
 import TruckFormFields from './TruckFormFields';
-import AdminPasswordInput from './AdminPasswordInput';
 
 import {
-  Button, Stack, Dialog, DialogTitle, DialogActions, DialogContent
+  Button, Stack, Dialog, DialogTitle, DialogActions, DialogContent, TextField, Box
 } from '@mui/material';
 
 const AddTruckForm = ({ onClose, adminPassword }) => {
@@ -15,6 +14,7 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
   const [imageUrls, setImageUrls] = useState([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [inputPwd, setInputPwd] = useState('');
+  const [buttonPos, setButtonPos] = useState({ x: 0, y: 0 });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,6 +55,25 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
     setConfirmOpen(true);
   };
 
+  // 按鈕躲避邏輯
+  const handleButtonHover = () => {
+    if (!inputPwd.trim()) {
+      // 如果密碼為空，按鈕就躲避
+      const maxMove = 100;
+      const randomX = Math.floor(Math.random() * maxMove * 2 - maxMove);
+      const randomY = Math.floor(Math.random() * maxMove * 2 - maxMove);
+      setButtonPos({ x: randomX, y: randomY });
+    }
+  };
+
+  const handleButtonClick = () => {
+    if (!inputPwd.trim()) {
+      alert('請先輸入密碼！');
+      return;
+    }
+    handleSubmit();
+  };
+
   return (
     <>
       <form onSubmit={handleFormSubmit}>
@@ -70,11 +89,35 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>確認新增？</DialogTitle>
         <DialogContent>
-          <AdminPasswordInput onPasswordSubmit={(pwd) => setInputPwd(pwd)} />
+          <TextField
+            label="管理員密碼"
+            type="password"
+            fullWidth
+            value={inputPwd}
+            onChange={(e) => setInputPwd(e.target.value)}
+            sx={{ mt: 2 }}
+            autoFocus
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>取消</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">確認新增</Button>
+          
+          {/* 有趣的躲避按鈕 */}
+          <Box sx={{ position: 'relative', display: 'inline-block' }}>
+            <Button
+              onMouseEnter={handleButtonHover}
+              onClick={handleButtonClick}
+              variant="contained"
+              color="primary"
+              sx={{
+                transform: `translate(${buttonPos.x}px, ${buttonPos.y}px)`,
+                transition: 'transform 0.3s ease',
+                position: 'relative',
+              }}
+            >
+              確認新增
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
     </>
