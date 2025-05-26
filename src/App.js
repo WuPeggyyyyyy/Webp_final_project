@@ -47,21 +47,7 @@ function App() {
   };
 
   const handleOpenPwdDialog = () => setEditPwdOpen(true);
-  const handleClosePwdDialog = () => {
-    setCurrentPwd('');
-    setNewPwd('');
-    setEditPwdOpen(false);
-  };
-
-  const handleChangePassword = () => {
-    if (currentPwd === adminPassword) {
-      setAdminPassword(newPwd);
-      alert('密碼修改成功');
-      handleClosePwdDialog();
-    } else {
-      alert('密碼錯誤，無法修改');
-    }
-  };
+  const handleClosePwdDialog = () => setEditPwdOpen(false);
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -168,6 +154,3 @@ function App() {
 }
 
 export default App;
-
-//https://console.cloudinary.com/app/c-52b22a1a285d1828bf344d100f615a/settings/upload/presets
-//https://console.firebase.google.com/project/cgu-foodtruck/settings/general/web:ODllMDVmYjktMTBhOC00OGZhLWE5MjgtZDRiZTk0MDBjMTU4?nonce=1747594581487

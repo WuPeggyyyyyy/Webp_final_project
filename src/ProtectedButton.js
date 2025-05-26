@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { Button, Dialog, DialogTitle, DialogContent, DialogActions, Typography } from '@mui/material';
+import {
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Typography,
+  Tooltip
+} from '@mui/material';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import AdminPasswordInput from './AdminPasswordInput';
 
 const ProtectedButton = ({
   label = '確認',
@@ -9,48 +19,79 @@ const ProtectedButton = ({
 }) => {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [showDialog, setShowDialog] = useState(false);
+  const [passwordInputOpen, setPasswordInputOpen] = useState(false);
+  const [bounce, setBounce] = useState(false);
 
   const moveRandom = () => {
-    const max = 80;
+    const max = 120;
     const rand = () => Math.floor(Math.random() * max * 2 - max);
-    setPos({ x: rand(), y: rand() });
+    const newPos = { x: rand(), y: rand() };
+    setPos(newPos);
+    setBounce(true);
+    setTimeout(() => {
+      setBounce(false);
+      setPos({ x: 0, y: 0 });
+    }, 1200);
   };
 
-  const handleMouseEnter = () => {
-    if (disabledCondition) {
-      if (fallback === 'move') moveRandom();
-      else if (fallback === 'dialog') setShowDialog(true);
+  const handleMouseMove = () => {
+    if (disabledCondition && fallback === 'move') {
+      moveRandom();
     }
   };
 
   const handleClick = () => {
-    if (!disabledCondition) onClick();
-    else if (fallback === 'dialog') setShowDialog(true);
+    if (!disabledCondition) {
+      setPasswordInputOpen(true);
+    } else if (fallback === 'dialog') {
+      setShowDialog(true);
+    }
+  };
+
+  const handlePasswordConfirm = (pwd) => {
+    setPasswordInputOpen(false);
+    onClick(pwd);
   };
 
   return (
     <>
-      <Button
-        variant="contained"
-        color="warning"
-        onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        sx={{
-          transform: `translate(${pos.x}px, ${pos.y}px)`,
-          transition: 'transform 0.2s ease',
-          position: 'relative',
-        }}
-      >
-        {label}
-      </Button>
+      <Tooltip title={disabledCondition ? '你按不到我喔 😜' : ''} arrow>
+        <span>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleClick}
+            onMouseMove={handleMouseMove}
+            startIcon={<WarningAmberIcon />}
+            sx={{
+              transform: `translate(${pos.x}px, ${pos.y}px) ${bounce ? 'scale(1.1)' : 'scale(1)'}`,
+              transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              position: 'relative',
+              pointerEvents: 'auto'
+            }}
+          >
+            {label}
+          </Button>
+        </span>
+      </Tooltip>
 
       <Dialog open={showDialog} onClose={() => setShowDialog(false)}>
         <DialogTitle>⚠️ 無法送出</DialogTitle>
         <DialogContent>
-          <Typography>請先輸入正確的密碼，再嘗試送出。</Typography>
+          <Typography>請先完成所有欄位，再嘗試送出。</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowDialog(false)}>了解</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={passwordInputOpen} onClose={() => setPasswordInputOpen(false)}>
+        <DialogTitle>請輸入管理員密碼</DialogTitle>
+        <DialogContent>
+          <AdminPasswordInput onPasswordSubmit={handlePasswordConfirm} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPasswordInputOpen(false)}>取消</Button>
         </DialogActions>
       </Dialog>
     </>

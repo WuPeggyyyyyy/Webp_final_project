@@ -21,8 +21,8 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async () => {
-    if (!verifyAdminPassword(inputPwd, adminPassword)) {
+  const handleSubmit = async (password) => {
+    if (!verifyAdminPassword(password, adminPassword)) {
       alert('密碼錯誤，新增失敗');
       return;
     }
@@ -36,8 +36,6 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
       alert('新增成功');
       setFormData({ name: '', type: '', location: '' });
       setImageUrls([]);
-      setInputPwd('');
-      setConfirmOpen(false);
       if (onClose) onClose();
     } catch (error) {
       console.error('新增失敗:', error);
@@ -45,15 +43,7 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
     }
   };
 
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-    const { name, type, location } = formData;
-    if (!name || !type || !location || imageUrls.length === 0) {
-      alert('請填寫所有欄位並上傳圖片');
-      return;
-    }
-    setConfirmOpen(true);
-  };
+  const formIncomplete = !formData.name || !formData.type || !formData.location || imageUrls.length === 0;
 
   // 按鈕躲避邏輯
   const handleButtonHover = () => {
