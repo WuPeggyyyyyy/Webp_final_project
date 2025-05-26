@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import AddTruckForm from './AddTruckForm';
 import TruckList from './TruckList';
+import ChangePassword from './ChangePassword';
 
 import {
-  AppBar, Toolbar, Typography, Button, Dialog, DialogTitle,
-  DialogContent, DialogActions, Container, Switch, FormControlLabel, CssBaseline,
-  IconButton, TextField
+  AppBar, Toolbar, Typography, Dialog, DialogTitle,
+  DialogContent, Container, Switch, FormControlLabel, CssBaseline,
+  IconButton, Button
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -18,8 +19,6 @@ function App() {
   });
   const [adminPassword, setAdminPassword] = useState('0000');
   const [editPwdOpen, setEditPwdOpen] = useState(false);
-  const [currentPwd, setCurrentPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
 
   const theme = useMemo(() =>
     createTheme({
@@ -41,21 +40,7 @@ function App() {
   };
 
   const handleOpenPwdDialog = () => setEditPwdOpen(true);
-  const handleClosePwdDialog = () => {
-    setCurrentPwd('');
-    setNewPwd('');
-    setEditPwdOpen(false);
-  };
-
-  const handleChangePassword = () => {
-    if (currentPwd === adminPassword) {
-      setAdminPassword(newPwd);
-      alert('密碼修改成功');
-      handleClosePwdDialog();
-    } else {
-      alert('密碼錯誤，無法修改');
-    }
-  };
+  const handleClosePwdDialog = () => setEditPwdOpen(false);
 
   return (
     <ThemeProvider theme={theme}>
@@ -89,38 +74,14 @@ function App() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editPwdOpen} onClose={handleClosePwdDialog}>
-        <DialogTitle>修改管理員密碼</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="目前密碼"
-            type="password"
-            fullWidth
-            sx={{ mt: 1 }}
-            value={currentPwd}
-            onChange={(e) => setCurrentPwd(e.target.value)}
-          />
-          <TextField
-            label="新密碼"
-            type="password"
-            fullWidth
-            sx={{ mt: 2 }}
-            value={newPwd}
-            onChange={(e) => setNewPwd(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClosePwdDialog}>取消</Button>
-          <Button onClick={handleChangePassword} variant="contained" color="primary">
-            確認修改
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ChangePassword
+        open={editPwdOpen}
+        onClose={handleClosePwdDialog}
+        adminPassword={adminPassword}
+        setAdminPassword={setAdminPassword}
+      />
     </ThemeProvider>
   );
 }
 
 export default App;
-
-//https://console.cloudinary.com/app/c-52b22a1a285d1828bf344d100f615a/settings/upload/presets
-//https://console.firebase.google.com/project/cgu-foodtruck/settings/general/web:ODllMDVmYjktMTBhOC00OGZhLWE5MjgtZDRiZTk0MDBjMTU4?nonce=1747594581487
