@@ -8,7 +8,7 @@ import {
 import { ArrowBack, Save, CalendarMonth } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { db } from './firebase';
-import { collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { Timestamp, collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { verifyAdminPassword } from './useAdminAuth';
 import './SchedulePage.css';
 
@@ -135,27 +135,25 @@ const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
     }
   }, [trucks, schedule, setGlobalSchedule]);
 
-  // 儲存時間表
+// 儲存時間表
   const handleSave = async () => {
-  // ... 密碼驗證邏輯 ...
-  
-  try {
-    await setDoc(doc(db, 'schedule', 'current'), {
-      schedule,
-      lastUpdated: new Date()
-    });
-    
-    // 儲存成功後，確保全域狀態是最新的
-    if (setGlobalSchedule) {
-      setGlobalSchedule(schedule);
+    try {
+      await setDoc(doc(db, 'schedule', 'current'), {
+        schedule,
+        lastUpdated: Timestamp.fromDate(new Date())  // 使用 Firestore 時間戳
+      });
+
+      // 儲存成功後，確保全域狀態是最新的
+      if (setGlobalSchedule) {
+        setGlobalSchedule(schedule);
+      }
+
+      console.log('SchedulePage: 儲存並同步成功');
+      alert('時間表儲存成功！');
+    } catch (error) {
+      console.error('儲存失敗:', error);
     }
-    
-    console.log('SchedulePage: 儲存並同步成功');
-    alert('時間表儲存成功！');
-  } catch (error) {
-    console.error('儲存失敗:', error);
-  }
-};
+  };
 
   // 月份導航
   const navigateMonth = (direction) => {
