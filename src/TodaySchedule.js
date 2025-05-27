@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, Typography, Grid, Chip, Box } from '@mui/material';
+import { Paper, Typography, Grid, Chip, Box, Button } from '@mui/material';
+import { KeyboardArrowDown } from '@mui/icons-material';
 
 const getLocalDateString = () => {
   return new Date().toISOString().split('T')[0];
@@ -8,7 +9,6 @@ const getLocalDateString = () => {
 const TodaySchedule = ({ globalSchedule = {} }) => {
   const [currentDate, setCurrentDate] = useState(getLocalDateString());
 
-  // 監控日期變化
   useEffect(() => {
     const checkDateChange = () => {
       const newDate = getLocalDateString();
@@ -17,12 +17,10 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
         console.log('TodaySchedule: 日期已更新:', newDate);
       }
     };
-
     const interval = setInterval(checkDateChange, 60000);
     return () => clearInterval(interval);
   }, [currentDate]);
 
-  // 監控 globalSchedule 變化
   useEffect(() => {
     console.log('TodaySchedule: 接收到新的 globalSchedule:', globalSchedule);
     console.log('TodaySchedule: globalSchedule keys:', Object.keys(globalSchedule));
@@ -33,43 +31,36 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
     console.log('當前日期:', currentDate);
     console.log('globalSchedule 類型:', typeof globalSchedule);
     console.log('globalSchedule 是否為空物件:', Object.keys(globalSchedule).length === 0);
-    
-    // 確保 globalSchedule 是有效物件
+
     if (!globalSchedule || typeof globalSchedule !== 'object') {
       console.warn('TodaySchedule: globalSchedule 無效');
-      return { '早餐': [], '午餐': [], '晚餐': [] };
+      return { '早餐': [], '午餐': [], '宵夜': [] };
     }
 
     const todayData = {};
-    
-    // 顯示所有 keys 的詳細資訊
     console.log('所有 globalSchedule keys:', Object.keys(globalSchedule));
     Object.keys(globalSchedule).forEach(key => {
       console.log(`Key: ${key}, 資料:`, globalSchedule[key]);
     });
 
-    // 更改為早午晚餐，並支援原有的宵夜資料
-    ['早餐', '午餐', '晚餐'].forEach(timeSlot => {
+    ['早餐', '午餐', '宵夜'].forEach(timeSlot => {
       const key = `${currentDate}-${timeSlot}`;
-      // 如果找不到晚餐，嘗試找宵夜的資料
       const fallbackKey = timeSlot === '晚餐' ? `${currentDate}-宵夜` : null;
-      
+
       let scheduleData = globalSchedule[key];
       if (!scheduleData && fallbackKey) {
         scheduleData = globalSchedule[fallbackKey];
         console.log(`使用備用 key: ${fallbackKey}`);
       }
-      
-      // 確保資料是陣列格式
+
       if (Array.isArray(scheduleData)) {
         todayData[timeSlot] = scheduleData;
       } else if (scheduleData && typeof scheduleData === 'object') {
-        // 如果是物件，嘗試轉換為陣列
         todayData[timeSlot] = Object.values(scheduleData);
       } else {
         todayData[timeSlot] = [];
       }
-      
+
       console.log(`查找 key: "${key}", 找到資料:`, globalSchedule[key]);
       console.log(`Key 是否存在:`, globalSchedule.hasOwnProperty(key));
       console.log(`時段 "${timeSlot}": 找到 ${todayData[timeSlot].length} 筆資料`);
@@ -79,17 +70,31 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
     return todayData;
   };
 
-  const todaySchedule = getTodaySchedule();
+  const scrollToTruck = (truckId) => {
+    const element = document.getElementById(`truck-${truckId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.style.border = '2px solid #ffc107';
+      setTimeout(() => {
+        element.style.border = '';
+      }, 3000);
+    }
+  };
 
-  // 計算每個時段的最大餐車數量，用於平均分配高度
+  const scrollToTruckList = () => {
+    const element = document.getElementById('truck-list-section');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const todaySchedule = getTodaySchedule();
   const maxTrucksCount = Math.max(
     todaySchedule['早餐']?.length || 0,
     todaySchedule['午餐']?.length || 0,
-    todaySchedule['晚餐']?.length || 0,
-    1 // 至少保持最小高度
+    todaySchedule['宵夜']?.length || 0,
+    1
   );
-
-  // 根據最大餐車數量動態計算最小高度
   const dynamicMinHeight = Math.max(200, 120 + (maxTrucksCount * 40));
 
   return (
@@ -98,15 +103,9 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
         📅 今日餐車時間表 ({currentDate})
       </Typography>
 
-      {/* 使用 Flexbox 確保平均分配 */}
       <Box sx={{ display: 'flex', gap: 2, minHeight: dynamicMinHeight }}>
-        {['早餐', '午餐', '晚餐'].map((timeSlot, index) => {
-          // 為每個時段設定不同的背景色
-          const backgroundColor = index === 0 ? '#fff3e0' : 
-                                 index === 1 ? '#e8f5e8' : '#f3e5f5';
-          
-          // 為每個時段設定不同的圖示
-          const timeIcon = index === 0 ? '🌅' : 
+        {['早餐', '午餐', '宵夜'].map((timeSlot, index) => {
+          const timeIcon = index === 0 ? '🌅' :
                           index === 1 ? '☀️' : '🌙';
 
           return (
@@ -114,10 +113,9 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
               key={timeSlot}
               elevation={2} 
               sx={{ 
-                flex: 1, // 平均分配寬度
+                flex: 1,
                 p: 2,
                 minHeight: dynamicMinHeight,
-                backgroundColor,
                 display: 'flex',
                 flexDirection: 'column'
               }}
@@ -137,7 +135,6 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
                 {timeIcon} {timeSlot}
               </Typography>
 
-              {/* 餐車列表容器 - 使用 flex-grow 填滿剩餘空間 */}
               <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                 {todaySchedule[timeSlot]?.length > 0 ? (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -147,19 +144,20 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
                         label={`${truck.name} (${truck.type})`}
                         variant="outlined"
                         size="small"
+                        onClick={() => scrollToTruck(truck.id)}
                         sx={{ 
                           width: '100%',
                           justifyContent: 'flex-start',
                           borderRadius: 2,
+                          cursor: 'pointer',
                           '& .MuiChip-label': {
                             fontSize: '0.875rem',
                             padding: '8px 12px'
                           },
                           transition: 'all 0.2s ease',
                           '&:hover': {
-                            backgroundColor: 'action.hover',
                             transform: 'translateY(-1px)',
-                            boxShadow: 1
+                            boxShadow: 2
                           }
                         }}
                       />
@@ -188,7 +186,6 @@ const TodaySchedule = ({ globalSchedule = {} }) => {
                 )}
               </Box>
 
-              {/* 餐車數量顯示 */}
               <Typography 
                 variant="caption" 
                 sx={{ 

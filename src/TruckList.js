@@ -246,7 +246,7 @@ function TruckList({ adminPassword, globalSchedule }) {
   };
 
   return (
-    <Box>
+    <Box id="truck-list-section">
       <TextField
         label="搜尋餐車"
         fullWidth
@@ -271,7 +271,7 @@ function TruckList({ adminPassword, globalSchedule }) {
 
       <Stack spacing={2}>
         {filteredTrucks.map((truck) => (
-          <Card key={truck.id}>
+          <Card key={truck.id} id={`truck-${truck.id}`}>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center">
                 <Typography variant="h6">{truck.name}</Typography>
