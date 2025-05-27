@@ -146,7 +146,7 @@ function App() {
                 window.location.href = '/schedule';
                 handleMenuClose();
               }}>
-                📅 新增時間
+                📅 時間表
               </MenuItem>
             </Menu>
           </Toolbar>
