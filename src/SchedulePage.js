@@ -12,7 +12,15 @@ import { Timestamp, collection, query, onSnapshot, doc, setDoc } from 'firebase/
 import { verifyAdminPassword } from './useAdminAuth';
 import './SchedulePage.css';
 
-const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
+function formatDateToYMD(date) {
+  const tzDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const year = tzDate.getFullYear();
+  const month = String(tzDate.getMonth() + 1).padStart(2, '0');
+  const day = String(tzDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule, darkMode }) => {
   const navigate = useNavigate();
   const [trucks, setTrucks] = useState([]);
   const [schedule, setSchedule] = useState({});
@@ -25,6 +33,18 @@ const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
 
   const timeSlots = ['早餐', '午餐', '宵夜'];
 
+  // 根據深色模式設置主容器的類名
+  useEffect(() => {
+    const scheduleContainer = document.querySelector('.schedule-page');
+    if (scheduleContainer) {
+      if (darkMode) {
+        scheduleContainer.classList.add('dark-mode');
+      } else {
+        scheduleContainer.classList.remove('dark-mode');
+      }
+    }
+  }, [darkMode]);
+
   // 同步 globalSchedule 到本地 schedule
   useEffect(() => {
     console.log('SchedulePage: 接收到 globalSchedule:', globalSchedule);
@@ -35,22 +55,19 @@ const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
   const generateDates = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
-    
     const endDate = new Date(lastDay);
     endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
-    
+
     const dates = [];
     const currentDate = new Date(startDate);
-    
+
     while (currentDate <= endDate) {
       dates.push({
-        date: currentDate.toISOString().split('T')[0],
+        date: formatDateToYMD(currentDate),
         dayName: currentDate.toLocaleDateString('zh-TW', { weekday: 'short' }),
         dayNumber: currentDate.getDate(),
         isCurrentMonth: currentDate.getMonth() === month,
@@ -58,7 +75,7 @@ const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
       });
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return dates;
   };
 
@@ -135,12 +152,12 @@ const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
     }
   }, [trucks, schedule, setGlobalSchedule]);
 
-// 儲存時間表
+  // 儲存時間表
   const handleSave = async () => {
     try {
       await setDoc(doc(db, 'schedule', 'current'), {
         schedule,
-        lastUpdated: Timestamp.fromDate(new Date())  // 使用 Firestore 時間戳
+        lastUpdated: Timestamp.fromDate(new Date())
       });
 
       // 儲存成功後，確保全域狀態是最新的
@@ -200,69 +217,76 @@ const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
   }
 
   return (
-    <Box className="schedule-page">
-      <AppBar position="static" sx={{ bgcolor: 'primary.main' }}>
+    <div className={`schedule-page ${darkMode ? 'dark-mode' : ''}`}>
+      <AppBar position="static" sx={{ backgroundColor: darkMode ? '#1c1c1c' : '#ff9800' }}>
         <Toolbar>
           <IconButton
-            color="inherit"
             onClick={() => navigate('/')}
             edge="start"
-            sx={{ mr: 2 }}
+            sx={{ mr: 2, color: darkMode ? '#f9a825' : 'white' }}
           >
             <ArrowBack />
           </IconButton>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" sx={{ flexGrow: 1, color: darkMode ? '#e0e0e0' : 'white' }}>
             餐車時間表管理
           </Typography>
           <Button
-            color="inherit"
+            variant="contained"
             startIcon={<Save />}
             onClick={() => setSaveDialogOpen(true)}
             disabled={isDragging}
+            sx={{
+              backgroundColor: darkMode ? '#f9a825' : '#ff9800',
+              color: darkMode ? '#1c1c1c' : 'white',
+              '&:hover': {
+                backgroundColor: darkMode ? '#ffb300' : '#f57c00'
+              }
+            }}
           >
             儲存時間表
           </Button>
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
         <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           {/* 可用餐車區域 */}
-          <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 2, 
+              mb: 3,
+              backgroundColor: darkMode ? '#2c2c2c' : 'white',
+              color: darkMode ? '#e0e0e0' : 'inherit'
+            }}
+          >
+            <Typography variant="h6" gutterBottom sx={{ color: darkMode ? '#f9a825' : '#ff9800' }}>
               可用餐車
             </Typography>
-            <Droppable 
-              droppableId="trucks" 
-              direction="horizontal"
-              isDropDisabled={false}
-              isCombineEnabled={false}
-              ignoreContainerClipping={false}
-            >
+            <Droppable droppableId="trucks" direction="horizontal">
               {(provided) => (
                 <Box
-                  ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="trucks-container"
+                  ref={provided.innerRef}
+                  className={`trucks-container ${darkMode ? 'dark-mode' : ''}`}
                 >
                   {trucks.map((truck, index) => (
-                    <Draggable 
-                      key={truck.id} 
-                      draggableId={truck.id} 
-                      index={index}
-                      isDragDisabled={false}
-                    >
+                    <Draggable key={truck.id} draggableId={`${truck.id}-truck`} index={index}>
                       {(provided, snapshot) => (
                         <Chip
-                          ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          label={truck.name}
+                          ref={provided.innerRef}
+                          label={`${truck.name} (${truck.type})`}
                           className={`truck-chip ${snapshot.isDragging ? 'dragging' : ''}`}
                           sx={{
-                            m: 0.5,
-                            cursor: 'grab',
-                            '&:active': { cursor: 'grabbing' }
+                            backgroundColor: darkMode ? '#f9a825' : '#ffcc80',
+                            color: darkMode ? '#1c1c1c' : '#333',
+                            border: darkMode ? 'none' : '1px solid #ffb74d',
+                            fontWeight: 500,
+                            '&:hover': {
+                              backgroundColor: darkMode ? '#ffb300' : '#ffb74d'
+                            }
                           }}
                         />
                       )}
@@ -274,124 +298,214 @@ const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
             </Droppable>
           </Paper>
 
-          {/* 月曆標題和導航 */}
-          <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+          {/* 月曆區域 */}
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 2,
+              backgroundColor: darkMode ? '#2c2c2c' : 'white',
+              color: darkMode ? '#e0e0e0' : 'inherit'
+            }}
+          >
+            {/* 月曆標題和導航 */}
             <Box className="calendar-header">
-              <Button onClick={() => navigateMonth(-1)}>‹ 上個月</Button>
-              <Typography variant="h5" className="month-title">
+              <Button 
+                onClick={() => navigateMonth(-1)}
+                sx={{ color: darkMode ? '#f9a825' : '#ff9800' }}
+              >
+                ‹ 上個月
+              </Button>
+              <Typography variant="h5" className="month-title" sx={{ color: darkMode ? '#f9a825' : '#ff9800' }}>
                 <CalendarMonth sx={{ mr: 1 }} />
                 {currentMonth.getFullYear()}年{currentMonth.getMonth() + 1}月 餐車時間表
               </Typography>
-              <Button onClick={() => navigateMonth(1)}>下個月 ›</Button>
+              <Button 
+                onClick={() => navigateMonth(1)}
+                sx={{ color: darkMode ? '#f9a825' : '#ff9800' }}
+              >
+                下個月 ›
+              </Button>
+            </Box>
+
+            {/* 週標題 */}
+            <Box className="week-header">
+              {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+                <Typography 
+                  key={day} 
+                  className="week-day"
+                  sx={{
+                    backgroundColor: darkMode ? '#2c2c2c' : '#ffcc80',
+                    color: darkMode ? '#f9a825' : '#333',
+                    border: darkMode ? '1px solid #444' : '1px solid #ffb74d',
+                    fontWeight: 600
+                  }}
+                >
+                  {day}
+                </Typography>
+              ))}
+            </Box>
+
+            {/* 月曆網格 */}
+            <Box className="calendar-grid">
+              {dates.map((dateInfo) => (
+                <Paper
+                  key={dateInfo.date}
+                  className={`calendar-cell ${!dateInfo.isCurrentMonth ? 'other-month' : ''} ${dateInfo.isToday ? 'today' : ''}`}
+                  elevation={1}
+                  sx={{
+                    backgroundColor: darkMode ? 
+                      (dateInfo.isToday ? '#2c1810' : dateInfo.isCurrentMonth ? '#1c1c1c' : '#0d0d0d') :
+                      (dateInfo.isToday ? '#fff3e0' : dateInfo.isCurrentMonth ? 'white' : '#f9f9f9'),
+                    border: darkMode ? 
+                      (dateInfo.isToday ? '2px solid #f9a825' : '1px solid #444') :
+                      (dateInfo.isToday ? '2px solid #ff9800' : '1px solid #e0e0e0'),
+                    color: darkMode ? '#e0e0e0' : 'inherit'
+                  }}
+                >
+                  <Typography 
+                    className="date-number"
+                    sx={{
+                      color: darkMode ? 
+                        (dateInfo.isToday ? '#f9a825' : dateInfo.isCurrentMonth ? '#e0e0e0' : '#666') :
+                        (dateInfo.isToday ? '#ff9800' : dateInfo.isCurrentMonth ? '#333' : '#999'),
+                      fontWeight: 600
+                    }}
+                  >
+                    {dateInfo.dayNumber}
+                  </Typography>
+                  
+                  {timeSlots.map((timeSlot) => {
+                    const slotKey = `${dateInfo.date}-${timeSlot}`;
+                    return (
+                      <Box key={timeSlot} className="time-slot">
+                        <Typography 
+                          className="time-slot-label"
+                          sx={{ 
+                            color: darkMode ? '#b0b0b0' : '#666',
+                            fontWeight: 500
+                          }}
+                        >
+                          {timeSlot}
+                        </Typography>
+                        <Droppable droppableId={slotKey}>
+                          {(provided, snapshot) => (
+                            <Box
+                              ref={provided.innerRef}
+                              {...provided.droppableProps}
+                              className={`drop-zone ${snapshot.isDraggingOver ? 'drag-over' : ''}`}
+                              sx={{
+                                backgroundColor: snapshot.isDraggingOver ? 
+                                  (darkMode ? '#1a2e1a' : '#e8f5e8') : 'transparent',
+                                border: snapshot.isDraggingOver ? 
+                                  '2px dashed #4caf50' : 'none'
+                              }}
+                            >
+                              {(schedule[slotKey] || []).map((truck, index) => (
+                                <Draggable 
+                                  key={`${truck.id}-${slotKey}`} 
+                                  draggableId={`${truck.id}-${slotKey}`} 
+                                  index={index}
+                                >
+                                  {(provided, snapshot) => (
+                                    <Chip
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      label={truck.name}
+                                      size="small"
+                                      className={`scheduled-truck ${snapshot.isDragging ? 'dragging' : ''}`}
+                                      sx={{
+                                        backgroundColor: darkMode ? '#f9a825 !important' : '#ffcc80 !important',
+                                        color: darkMode ? '#1c1c1c !important' : '#333 !important',
+                                        fontWeight: '500 !important'
+                                      }}
+                                    />
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                            </Box>
+                          )}
+                        </Droppable>
+                      </Box>
+                    );
+                  })}
+                </Paper>
+              ))}
             </Box>
           </Paper>
-
-          {/* 週標題 */}
-          <Box className="week-header">
-            {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-              <Typography key={day} className="week-day">
-                {day}
-              </Typography>
-            ))}
-          </Box>
-
-          {/* 月曆網格 */}
-          <Box className="calendar-grid">
-            {dates.map((dateInfo) => (
-              <Paper
-                key={dateInfo.date}
-                className={`calendar-cell ${!dateInfo.isCurrentMonth ? 'other-month' : ''} ${dateInfo.isToday ? 'today' : ''}`}
-                elevation={1}
-              >
-                <Typography className="date-number">
-                  {dateInfo.dayNumber}
-                </Typography>
-                
-                {timeSlots.map((timeSlot) => {
-                  const slotKey = `${dateInfo.date}-${timeSlot}`;
-                  return (
-                    <Box key={timeSlot} className="time-slot">
-                      <Typography className="time-slot-label">
-                        {timeSlot}
-                      </Typography>
-                      <Droppable 
-                        droppableId={slotKey}
-                        isDropDisabled={false}
-                        isCombineEnabled={false}
-                        ignoreContainerClipping={false}
-                      >
-                        {(provided, snapshot) => (
-                          <Box
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`drop-zone ${snapshot.isDraggingOver ? 'drag-over' : ''}`}
-                          >
-                            {(schedule[slotKey] || []).map((truck, index) => (
-                              <Draggable 
-                                key={`${truck.id}-${slotKey}`} 
-                                draggableId={`${truck.id}-${slotKey}`} 
-                                index={index}
-                                isDragDisabled={false}
-                              >
-                                {(provided, snapshot) => (
-                                  <Chip
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    label={truck.name}
-                                    size="small"
-                                    className={`scheduled-truck ${snapshot.isDragging ? 'dragging' : ''}`}
-                                  />
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </Box>
-                        )}
-                      </Droppable>
-                    </Box>
-                  );
-                })}
-              </Paper>
-            ))}
-          </Box>
         </DragDropContext>
       </Container>
 
       {/* 儲存確認對話框 */}
-      <Dialog open={saveDialogOpen} onClose={handleCloseDialog}>
-        <DialogTitle>儲存時間表</DialogTitle>
+      <Dialog 
+        open={saveDialogOpen} 
+        onClose={handleCloseDialog}
+        PaperProps={{
+          sx: {
+            backgroundColor: darkMode ? '#2c2c2c' : 'white',
+            color: darkMode ? '#e0e0e0' : 'inherit'
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: darkMode ? '#f9a825' : '#ff9800' }}>
+          儲存時間表
+        </DialogTitle>
         <DialogContent>
-          <Typography gutterBottom>
+          <Typography sx={{ color: darkMode ? '#e0e0e0' : 'inherit' }}>
             請輸入管理員密碼以儲存時間表
           </Typography>
           <TextField
             fullWidth
             type="password"
-            label="管理員密碼"
             value={inputPwd}
             onChange={(e) => setInputPwd(e.target.value)}
-            sx={{ mt: 2 }}
+            sx={{ 
+              mt: 2,
+              '& .MuiInputBase-root': {
+                backgroundColor: darkMode ? '#1c1c1c' : 'white',
+                color: darkMode ? '#e0e0e0' : 'inherit'
+              },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: darkMode ? '#444' : 'rgba(0, 0, 0, 0.23)'
+              },
+              '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: darkMode ? '#f9a825' : '#ff9800'
+              },
+              '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: darkMode ? '#f9a825' : '#ff9800'
+              }
+            }}
             autoFocus
             placeholder="請輸入密碼..."
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>取消</Button>
+          <Button 
+            onClick={handleCloseDialog}
+            sx={{ color: darkMode ? '#e0e0e0' : '#666' }}
+          >
+            取消
+          </Button>
           <Button
             onClick={handleSaveClick}
             onMouseEnter={handleButtonHover}
+            disabled={!inputPwd.trim()}
             sx={{
               transform: `translate(${buttonPos.x}px, ${buttonPos.y}px)`,
-              transition: 'transform 0.3s ease'
+              transition: 'transform 0.3s ease',
+              backgroundColor: darkMode ? '#f9a825' : '#ff9800',
+              color: darkMode ? '#1c1c1c' : 'white',
+              '&:hover': {
+                backgroundColor: darkMode ? '#ffb300' : '#f57c00'
+              }
             }}
-            variant="contained"
           >
             {!inputPwd.trim() ? '按不到我喔' : '確認儲存'}
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   );
 };
 

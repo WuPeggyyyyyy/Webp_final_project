@@ -170,6 +170,7 @@ function App() {
                   adminPassword={adminPassword}
                   globalSchedule={globalSchedule}
                   setGlobalSchedule={setGlobalSchedule}
+                  darkMode={darkMode}
                 />
               } 
             />

@@ -42,6 +42,7 @@
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
   margin-bottom: 8px;
+  width: 100%;
 }
 
 .week-day {
@@ -51,6 +52,8 @@
   background-color: #e3f2fd;
   border-radius: 4px;
   color: #1976d2;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .calendar-grid {
@@ -58,6 +61,7 @@
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
   margin-bottom: 20px;
+  width: 100%;
 }
 
 .calendar-cell {
@@ -68,6 +72,11 @@
   border: 1px solid #e0e0e0;
   background-color: white;
   transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+  /* 固定寬度，不允許內容撐大 */
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .calendar-cell:hover {
@@ -89,6 +98,10 @@
   font-size: 1.1rem;
   margin-bottom: 8px;
   color: #333;
+  /* 確保日期數字也不會撐大容器 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .calendar-cell.today .date-number {
@@ -102,6 +115,8 @@
 .time-slot {
   margin-bottom: 8px;
   flex: 1;
+  /* 確保時間段不會撐大容器 */
+  min-width: 0;
 }
 
 .time-slot-label {
@@ -109,6 +124,10 @@
   color: #666;
   font-weight: 500;
   margin-bottom: 4px;
+  /* 確保標籤也使用省略號 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .drop-zone {
@@ -119,6 +138,11 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  /* 固定寬度，不允許內容撐大 */
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .drop-zone.drag-over {
@@ -132,6 +156,16 @@
   margin-bottom: 2px;
   cursor: grab;
   transition: all 0.2s ease;
+  /* 固定寬度和省略號設定 */
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  /* 確保內容不會撐大 chip */
+  min-width: 0;
+  display: block;
 }
 
 .scheduled-truck:active {
@@ -148,33 +182,65 @@
   .calendar-grid {
     grid-template-columns: repeat(7, 1fr);
     gap: 4px;
+    width: 100%;
   }
-  
+
   .calendar-cell {
     min-height: 120px;
     padding: 4px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
-  
+
   .date-number {
     font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  
+
   .time-slot-label {
     font-size: 0.65rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  
+
   .scheduled-truck {
     font-size: 0.6rem !important;
     height: 18px !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
-  
+
   .month-title {
     font-size: 1.2rem;
   }
-  
+
   .calendar-header {
     flex-direction: column;
     gap: 8px;
+  }
+
+  .week-day {
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .drop-zone {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 }
 
@@ -182,16 +248,41 @@
   .week-day {
     padding: 8px 4px;
     font-size: 0.8rem;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  
+
   .calendar-cell {
     min-height: 100px;
     padding: 2px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
-  
+
   .trucks-container {
     min-height: 50px;
     padding: 4px;
+  }
+
+  .scheduled-truck {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .drop-zone {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 }
 
@@ -224,9 +315,138 @@
   text-align: center;
   display: block;
   padding: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .drop-zone.drag-over:empty::after {
   content: "放開以安排餐車";
   color: #4caf50;
+}
+
+/* 深色模式樣式 */
+.schedule-page.dark-mode {
+  background-color: #0d0d0d;
+  color: #e0e0e0;
+}
+
+.schedule-page.dark-mode .trucks-container {
+  background-color: #1c1c1c;
+  border-color: #444;
+}
+
+.schedule-page.dark-mode .trucks-container.dark-mode {
+  background-color: #1c1c1c;
+  border: 2px dashed #444;
+}
+
+.schedule-page.dark-mode .week-day {
+  background-color: #2c2c2c;
+  color: #f9a825;
+  border: 1px solid #444;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-page.dark-mode .calendar-cell {
+  background-color: #1c1c1c;
+  border: 1px solid #444;
+  color: #e0e0e0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.schedule-page.dark-mode .calendar-cell:hover {
+  box-shadow: 0 4px 8px rgba(249, 168, 37, 0.2);
+}
+
+.schedule-page.dark-mode .calendar-cell.other-month {
+  background-color: #0d0d0d;
+  opacity: 0.6;
+}
+
+.schedule-page.dark-mode .calendar-cell.today {
+  background-color: #2c1810;
+  border: 2px solid #f9a825;
+}
+
+.schedule-page.dark-mode .date-number {
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-page.dark-mode .calendar-cell.today .date-number {
+  color: #f9a825;
+}
+
+.schedule-page.dark-mode .calendar-cell.other-month .date-number {
+  color: #666;
+}
+
+.schedule-page.dark-mode .time-slot-label {
+  color: #b0b0b0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-page.dark-mode .drop-zone {
+  background-color: transparent;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.schedule-page.dark-mode .drop-zone.drag-over {
+  background-color: #1a2e1a;
+  border: 2px dashed #4caf50;
+}
+
+.schedule-page.dark-mode .scheduled-truck {
+  background-color: #f9a825 !important;
+  color: #1c1c1c !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.schedule-page.dark-mode .drop-zone:empty::after {
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-page.dark-mode .drop-zone.drag-over:empty::after {
+  color: #4caf50;
+}
+
+/* 深色模式下的按鈕樣式 */
+.schedule-page.dark-mode button {
+  background-color: #f9a825;
+  color: #1c1c1c;
+}
+
+.schedule-page.dark-mode button:hover {
+  background-color: #ffb300;
+}
+
+/* 深色模式下的輸入框樣式 */
+.schedule-page.dark-mode input[type="text"],
+.schedule-page.dark-mode input[type="password"] {
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+  border: 1px solid #444;
 }
