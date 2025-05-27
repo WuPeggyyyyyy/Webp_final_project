@@ -12,8 +12,7 @@ import EditTruckForm from './EditTruckForm';
 import DeleteTruckForm from './DeleteTruckForm';
 import TodaySchedule from './TodaySchedule';
 
-
-function TruckList({ adminPassword }) {
+function TruckList({ adminPassword, globalSchedule }) {
   const [trucks, setTrucks] = useState([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -29,10 +28,7 @@ function TruckList({ adminPassword }) {
   const [editingTruck, setEditingTruck] = useState(null);
   const [deletingTruckId, setDeletingTruckId] = useState(null);
 
-  // 新增今日時間表狀態
-  const [todaySchedule, setTodaySchedule] = useState({});
-
-  // 其他狀態保持不變...
+  // 其他狀態
   const [newTruckName, setNewTruckName] = useState('');
   const [newTruckLocation, setNewTruckLocation] = useState('管理大樓');
   const [newTruckType, setNewTruckType] = useState('小吃');
@@ -176,7 +172,7 @@ function TruckList({ adminPassword }) {
     });
   };
 
-  // 其他函式保持不變...
+  // 圖片處理函式
   const handleNewImageChange = (e) => {
     const files = Array.from(e.target.files).slice(0, 4);
     if (!files) return;
@@ -195,6 +191,7 @@ function TruckList({ adminPassword }) {
     });
   };
 
+  // 新增餐車函式
   const handleAddTruck = async () => {
     if (!newTruckName.trim()) {
       alert('請輸入餐車名稱');
@@ -269,8 +266,8 @@ function TruckList({ adminPassword }) {
         sx={{ mb: 2 }}
       />
 
-      {/* 使用獨立的今日時間表元件 */}
-      <TodaySchedule />
+      {/* 使用全域狀態的今日時間表元件 */}
+      <TodaySchedule globalSchedule={globalSchedule} />
 
       <Stack spacing={2}>
         {filteredTrucks.map((truck) => (

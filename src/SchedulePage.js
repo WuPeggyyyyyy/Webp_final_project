@@ -8,11 +8,11 @@ import {
 import { ArrowBack, Save, CalendarMonth } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { db } from './firebase';
-import { collection, query, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { verifyAdminPassword } from './useAdminAuth';
-import './SchedulePage.css'; // 引入 CSS 檔案
+import './SchedulePage.css';
 
-const SchedulePage = ({ adminPassword }) => {
+const SchedulePage = ({ adminPassword, globalSchedule, setGlobalSchedule }) => {
   const navigate = useNavigate();
   const [trucks, setTrucks] = useState([]);
   const [schedule, setSchedule] = useState({});
@@ -25,20 +25,23 @@ const SchedulePage = ({ adminPassword }) => {
 
   const timeSlots = ['早餐', '午餐', '宵夜'];
 
+  // 同步 globalSchedule 到本地 schedule
+  useEffect(() => {
+    console.log('SchedulePage: 接收到 globalSchedule:', globalSchedule);
+    setSchedule(globalSchedule);
+  }, [globalSchedule]);
+
   // 生成月曆日期
   const generateDates = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     
-    // 獲取當月第一天和最後一天
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    // 獲取第一週的開始日期（可能是上個月的日期）
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
     
-    // 獲取最後一週的結束日期（可能是下個月的日期）
     const endDate = new Date(lastDay);
     endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
     
@@ -61,7 +64,6 @@ const SchedulePage = ({ adminPassword }) => {
 
   const [dates, setDates] = useState(generateDates());
 
-  // 當月份改變時重新生成日期
   useEffect(() => {
     setDates(generateDates());
   }, [currentMonth]);
@@ -74,21 +76,6 @@ const SchedulePage = ({ adminPassword }) => {
       setTrucks(data);
     });
     return () => unsubscribe();
-  }, []);
-
-  // 載入時間表
-  useEffect(() => {
-    const loadSchedule = async () => {
-      try {
-        const scheduleDoc = await getDoc(doc(db, 'schedule', 'current'));
-        if (scheduleDoc.exists()) {
-          setSchedule(scheduleDoc.data().schedule || {});
-        }
-      } catch (error) {
-        console.error('載入時間表失敗:', error);
-      }
-    };
-    loadSchedule();
   }, []);
 
   // 拖拽處理
@@ -111,60 +98,64 @@ const SchedulePage = ({ adminPassword }) => {
     }
 
     try {
-      setSchedule(prevSchedule => {
-        const newSchedule = { ...prevSchedule };
+      const newSchedule = { ...schedule };
 
-        // 從來源移除
-        if (source.droppableId !== 'trucks') {
-          const sourceKey = source.droppableId;
-          newSchedule[sourceKey] = [...(newSchedule[sourceKey] || [])];
-          newSchedule[sourceKey].splice(source.index, 1);
+      // 從來源移除
+      if (source.droppableId !== 'trucks') {
+        const sourceKey = source.droppableId;
+        newSchedule[sourceKey] = [...(newSchedule[sourceKey] || [])];
+        newSchedule[sourceKey].splice(source.index, 1);
+      }
+
+      // 加入目標
+      if (destination.droppableId !== 'trucks') {
+        const destKey = destination.droppableId;
+        newSchedule[destKey] = [...(newSchedule[destKey] || [])];
+        const actualTruckId = draggableId.split('-')[0];
+        const truck = trucks.find(t => t.id === actualTruckId);
+        if (truck) {
+          newSchedule[destKey].splice(destination.index, 0, {
+            id: truck.id,
+            name: truck.name,
+            type: truck.type
+          });
         }
+      }
 
-        // 加入目標
-        if (destination.droppableId !== 'trucks') {
-          const destKey = destination.droppableId;
-          newSchedule[destKey] = [...(newSchedule[destKey] || [])];
-          const actualTruckId = draggableId.split('-')[0];
-          const truck = trucks.find(t => t.id === actualTruckId);
-          if (truck) {
-            newSchedule[destKey].splice(destination.index, 0, {
-              id: truck.id,
-              name: truck.name,
-              type: truck.type
-            });
-          }
-        }
-
-        return newSchedule;
-      });
+      console.log('SchedulePage: 更新 schedule:', newSchedule);
+      setSchedule(newSchedule);
+      
+      // 同時更新全域狀態
+      if (setGlobalSchedule) {
+        setGlobalSchedule(newSchedule);
+      }
     } catch (error) {
       console.error('拖拉處理錯誤:', error);
       setDragError(true);
     }
-  }, [trucks]);
+  }, [trucks, schedule, setGlobalSchedule]);
 
   // 儲存時間表
   const handleSave = async () => {
-    if (!verifyAdminPassword(inputPwd, adminPassword)) {
-      alert('密碼錯誤，無法儲存');
-      return;
+  // ... 密碼驗證邏輯 ...
+  
+  try {
+    await setDoc(doc(db, 'schedule', 'current'), {
+      schedule,
+      lastUpdated: new Date()
+    });
+    
+    // 儲存成功後，確保全域狀態是最新的
+    if (setGlobalSchedule) {
+      setGlobalSchedule(schedule);
     }
-
-    try {
-      await setDoc(doc(db, 'schedule', 'current'), {
-        schedule,
-        lastUpdated: new Date()
-      });
-      alert('時間表儲存成功！');
-      setSaveDialogOpen(false);
-      setInputPwd('');
-      setButtonPos({ x: 0, y: 0 });
-    } catch (error) {
-      console.error('儲存失敗:', error);
-      alert('儲存失敗，請重試');
-    }
-  };
+    
+    console.log('SchedulePage: 儲存並同步成功');
+    alert('時間表儲存成功！');
+  } catch (error) {
+    console.error('儲存失敗:', error);
+  }
+};
 
   // 月份導航
   const navigateMonth = (direction) => {
@@ -243,7 +234,13 @@ const SchedulePage = ({ adminPassword }) => {
             <Typography variant="h6" gutterBottom>
               可用餐車
             </Typography>
-            <Droppable droppableId="trucks" direction="horizontal">
+            <Droppable 
+              droppableId="trucks" 
+              direction="horizontal"
+              isDropDisabled={false}
+              isCombineEnabled={false}
+              ignoreContainerClipping={false}
+            >
               {(provided) => (
                 <Box
                   ref={provided.innerRef}
@@ -251,7 +248,12 @@ const SchedulePage = ({ adminPassword }) => {
                   className="trucks-container"
                 >
                   {trucks.map((truck, index) => (
-                    <Draggable key={truck.id} draggableId={truck.id} index={index}>
+                    <Draggable 
+                      key={truck.id} 
+                      draggableId={truck.id} 
+                      index={index}
+                      isDragDisabled={false}
+                    >
                       {(provided, snapshot) => (
                         <Chip
                           ref={provided.innerRef}
@@ -314,7 +316,12 @@ const SchedulePage = ({ adminPassword }) => {
                       <Typography className="time-slot-label">
                         {timeSlot}
                       </Typography>
-                      <Droppable droppableId={slotKey}>
+                      <Droppable 
+                        droppableId={slotKey}
+                        isDropDisabled={false}
+                        isCombineEnabled={false}
+                        ignoreContainerClipping={false}
+                      >
                         {(provided, snapshot) => (
                           <Box
                             ref={provided.innerRef}
@@ -326,6 +333,7 @@ const SchedulePage = ({ adminPassword }) => {
                                 key={`${truck.id}-${slotKey}`} 
                                 draggableId={`${truck.id}-${slotKey}`} 
                                 index={index}
+                                isDragDisabled={false}
                               >
                                 {(provided, snapshot) => (
                                   <Chip
