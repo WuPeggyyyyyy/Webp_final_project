@@ -3,13 +3,14 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import {
   Box, Typography, Paper, Grid, Card, CardContent, Button,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Chip, IconButton, AppBar, Toolbar, Alert
+  Chip, IconButton, AppBar, Toolbar, Alert, Container
 } from '@mui/material';
-import { ArrowBack, Save } from '@mui/icons-material';
+import { ArrowBack, Save, CalendarMonth } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { db } from './firebase';
 import { collection, query, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore';
 import { verifyAdminPassword } from './useAdminAuth';
+import './SchedulePage.css'; // 引入 CSS 檔案
 
 const SchedulePage = ({ adminPassword }) => {
   const navigate = useNavigate();
@@ -19,32 +20,53 @@ const SchedulePage = ({ adminPassword }) => {
   const [inputPwd, setInputPwd] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [dragError, setDragError] = useState(false);
-
-  // 躲避按鈕用的狀態
   const [buttonPos, setButtonPos] = useState({ x: 0, y: 0 });
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const timeSlots = ['早餐', '午餐', '宵夜'];
 
+  // 生成月曆日期
   const generateDates = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    
+    // 獲取當月第一天和最後一天
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    // 獲取第一週的開始日期（可能是上個月的日期）
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    
+    // 獲取最後一週的結束日期（可能是下個月的日期）
+    const endDate = new Date(lastDay);
+    endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
+    
     const dates = [];
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
       dates.push({
-        date: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-        dayName: date.toLocaleDateString('zh-TW', { weekday: 'short' }),
-        dayNumber: day
+        date: currentDate.toISOString().split('T')[0],
+        dayName: currentDate.toLocaleDateString('zh-TW', { weekday: 'short' }),
+        dayNumber: currentDate.getDate(),
+        isCurrentMonth: currentDate.getMonth() === month,
+        isToday: currentDate.toDateString() === new Date().toDateString()
       });
+      currentDate.setDate(currentDate.getDate() + 1);
     }
+    
     return dates;
   };
 
-  const [dates] = useState(generateDates());
+  const [dates, setDates] = useState(generateDates());
 
+  // 當月份改變時重新生成日期
+  useEffect(() => {
+    setDates(generateDates());
+  }, [currentMonth]);
+
+  // 載入餐車資料
   useEffect(() => {
     const q = query(collection(db, 'trucks'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -54,6 +76,7 @@ const SchedulePage = ({ adminPassword }) => {
     return () => unsubscribe();
   }, []);
 
+  // 載入時間表
   useEffect(() => {
     const loadSchedule = async () => {
       try {
@@ -68,6 +91,7 @@ const SchedulePage = ({ adminPassword }) => {
     loadSchedule();
   }, []);
 
+  // 拖拽處理
   const handleDragStart = useCallback(() => {
     setIsDragging(true);
     setDragError(false);
@@ -76,7 +100,9 @@ const SchedulePage = ({ adminPassword }) => {
   const handleDragEnd = useCallback((result) => {
     setIsDragging(false);
     const { destination, source, draggableId } = result;
+
     if (!destination) return;
+
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
@@ -87,12 +113,15 @@ const SchedulePage = ({ adminPassword }) => {
     try {
       setSchedule(prevSchedule => {
         const newSchedule = { ...prevSchedule };
+
+        // 從來源移除
         if (source.droppableId !== 'trucks') {
           const sourceKey = source.droppableId;
           newSchedule[sourceKey] = [...(newSchedule[sourceKey] || [])];
           newSchedule[sourceKey].splice(source.index, 1);
         }
 
+        // 加入目標
         if (destination.droppableId !== 'trucks') {
           const destKey = destination.droppableId;
           newSchedule[destKey] = [...(newSchedule[destKey] || [])];
@@ -115,6 +144,7 @@ const SchedulePage = ({ adminPassword }) => {
     }
   }, [trucks]);
 
+  // 儲存時間表
   const handleSave = async () => {
     if (!verifyAdminPassword(inputPwd, adminPassword)) {
       alert('密碼錯誤，無法儲存');
@@ -136,12 +166,16 @@ const SchedulePage = ({ adminPassword }) => {
     }
   };
 
-  const handleCloseDialog = () => {
-    setSaveDialogOpen(false);
-    setInputPwd('');
-    setButtonPos({ x: 0, y: 0 });
+  // 月份導航
+  const navigateMonth = (direction) => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev);
+      newMonth.setMonth(prev.getMonth() + direction);
+      return newMonth;
+    });
   };
 
+  // 躲避按鈕邏輯
   const handleButtonHover = () => {
     if (inputPwd.trim()) return;
     const offsetX = Math.floor(Math.random() * 120 - 60);
@@ -154,32 +188,38 @@ const SchedulePage = ({ adminPassword }) => {
     handleSave();
   };
 
-  const resetError = () => {
-    setDragError(false);
-    setIsDragging(false);
+  const handleCloseDialog = () => {
+    setSaveDialogOpen(false);
+    setInputPwd('');
+    setButtonPos({ x: 0, y: 0 });
   };
 
   if (dragError) {
     return (
-      <Box sx={{ p: 2 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
+      <Container>
+        <Alert severity="error" sx={{ mt: 2 }}>
           拖拉功能發生錯誤，請重新整理頁面或點擊重置按鈕
         </Alert>
-        <Button variant="contained" onClick={resetError} sx={{ mr: 2 }}>
+        <Button onClick={() => setDragError(false)} sx={{ mt: 1, mr: 1 }}>
           重置
         </Button>
-        <Button variant="outlined" onClick={() => window.location.reload()}>
+        <Button onClick={() => window.location.reload()} sx={{ mt: 1 }}>
           重新整理頁面
         </Button>
-      </Box>
+      </Container>
     );
   }
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
+    <Box className="schedule-page">
+      <AppBar position="static" sx={{ bgcolor: 'primary.main' }}>
         <Toolbar>
-          <IconButton color="inherit" onClick={() => navigate('/')} edge="start">
+          <IconButton
+            color="inherit"
+            onClick={() => navigate('/')}
+            edge="start"
+            sx={{ mr: 2 }}
+          >
             <ArrowBack />
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -196,130 +236,133 @@ const SchedulePage = ({ adminPassword }) => {
         </Toolbar>
       </AppBar>
 
-      <DragDropContext
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onBeforeCapture={() => setDragError(false)}
-      >
-        <Grid container spacing={2} sx={{ p: 2 }}>
-          <Grid item xs={12} md={3}>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom>可用餐車</Typography>
-              <Droppable droppableId="trucks" isDropDisabled={true}>
-                {(provided) => (
-                  <Box {...provided.droppableProps} ref={provided.innerRef} sx={{ minHeight: 100 }}>
-                    {trucks.map((truck, index) => (
-                      <Draggable
-                        key={truck.id}
-                        draggableId={truck.id}
-                        index={index}
-                        isDragDisabled={isDragging}
-                      >
-                        {(provided, snapshot) => (
-                          <Card
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            sx={{
-                              mb: 1,
-                              opacity: snapshot.isDragging ? 0.8 : 1,
-                              cursor: isDragging ? 'not-allowed' : 'grab',
-                            }}
-                          >
-                            <CardContent sx={{ py: 1 }}>
-                              <Typography variant="body2">{truck.name}</Typography>
-                              <Chip label={truck.type} size="small" />
-                            </CardContent>
-                          </Card>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </Box>
-                )}
-              </Droppable>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={9}>
-            <Typography variant="h5" gutterBottom>
-              {new Date().getFullYear()}年{new Date().getMonth() + 1}月 餐車時間表
+      <Container maxWidth="xl" sx={{ mt: 2 }}>
+        <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          {/* 可用餐車區域 */}
+          <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              可用餐車
             </Typography>
-            <Grid container spacing={1}>
-              {dates.map((dateInfo) => (
-                <Grid item xs={12} sm={6} md={4} key={dateInfo.date}>
-                  <Paper sx={{ p: 1, minHeight: 300 }}>
-                    <Typography variant="h6" align="center" gutterBottom>
-                      {dateInfo.dayNumber}日 ({dateInfo.dayName})
-                    </Typography>
-                    {timeSlots.map((timeSlot) => {
-                      const slotKey = `${dateInfo.date}-${timeSlot}`;
-                      return (
-                        <Box key={slotKey} sx={{ mb: 2 }}>
-                          <Typography variant="subtitle2" gutterBottom>{timeSlot}</Typography>
-                          <Droppable droppableId={slotKey}>
-                            {(provided, snapshot) => (
-                              <Box
-                                {...provided.droppableProps}
-                                ref={provided.innerRef}
-                                sx={{
-                                  minHeight: 60,
-                                  p: 1,
-                                  border: '1px dashed #ccc',
-                                  borderRadius: 1,
-                                  backgroundColor: snapshot.isDraggingOver ? '#e3f2fd' : 'transparent'
-                                }}
-                              >
-                                {(schedule[slotKey] || []).map((truck, index) => (
-                                  <Draggable
-                                    key={`${truck.id}-${slotKey}-${index}`}
-                                    draggableId={`${truck.id}-${slotKey}-${index}`}
-                                    index={index}
-                                    isDragDisabled={isDragging}
-                                  >
-                                    {(provided, snapshot) => (
-                                      <Chip
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        label={truck.name}
-                                        size="small"
-                                        sx={{
-                                          m: 0.5,
-                                          opacity: snapshot.isDragging ? 0.8 : 1,
-                                          cursor: isDragging ? 'not-allowed' : 'grab'
-                                        }}
-                                        color="primary"
-                                      />
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </Box>
-                            )}
-                          </Droppable>
-                        </Box>
-                      );
-                    })}
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </Grid>
-        </Grid>
-      </DragDropContext>
+            <Droppable droppableId="trucks" direction="horizontal">
+              {(provided) => (
+                <Box
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="trucks-container"
+                >
+                  {trucks.map((truck, index) => (
+                    <Draggable key={truck.id} draggableId={truck.id} index={index}>
+                      {(provided, snapshot) => (
+                        <Chip
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          label={truck.name}
+                          className={`truck-chip ${snapshot.isDragging ? 'dragging' : ''}`}
+                          sx={{
+                            m: 0.5,
+                            cursor: 'grab',
+                            '&:active': { cursor: 'grabbing' }
+                          }}
+                        />
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </Box>
+              )}
+            </Droppable>
+          </Paper>
 
-      {/* ✅ 躲避按鈕的儲存確認對話框 */}
+          {/* 月曆標題和導航 */}
+          <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+            <Box className="calendar-header">
+              <Button onClick={() => navigateMonth(-1)}>‹ 上個月</Button>
+              <Typography variant="h5" className="month-title">
+                <CalendarMonth sx={{ mr: 1 }} />
+                {currentMonth.getFullYear()}年{currentMonth.getMonth() + 1}月 餐車時間表
+              </Typography>
+              <Button onClick={() => navigateMonth(1)}>下個月 ›</Button>
+            </Box>
+          </Paper>
+
+          {/* 週標題 */}
+          <Box className="week-header">
+            {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+              <Typography key={day} className="week-day">
+                {day}
+              </Typography>
+            ))}
+          </Box>
+
+          {/* 月曆網格 */}
+          <Box className="calendar-grid">
+            {dates.map((dateInfo) => (
+              <Paper
+                key={dateInfo.date}
+                className={`calendar-cell ${!dateInfo.isCurrentMonth ? 'other-month' : ''} ${dateInfo.isToday ? 'today' : ''}`}
+                elevation={1}
+              >
+                <Typography className="date-number">
+                  {dateInfo.dayNumber}
+                </Typography>
+                
+                {timeSlots.map((timeSlot) => {
+                  const slotKey = `${dateInfo.date}-${timeSlot}`;
+                  return (
+                    <Box key={timeSlot} className="time-slot">
+                      <Typography className="time-slot-label">
+                        {timeSlot}
+                      </Typography>
+                      <Droppable droppableId={slotKey}>
+                        {(provided, snapshot) => (
+                          <Box
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`drop-zone ${snapshot.isDraggingOver ? 'drag-over' : ''}`}
+                          >
+                            {(schedule[slotKey] || []).map((truck, index) => (
+                              <Draggable 
+                                key={`${truck.id}-${slotKey}`} 
+                                draggableId={`${truck.id}-${slotKey}`} 
+                                index={index}
+                              >
+                                {(provided, snapshot) => (
+                                  <Chip
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    label={truck.name}
+                                    size="small"
+                                    className={`scheduled-truck ${snapshot.isDragging ? 'dragging' : ''}`}
+                                  />
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </Box>
+                        )}
+                      </Droppable>
+                    </Box>
+                  );
+                })}
+              </Paper>
+            ))}
+          </Box>
+        </DragDropContext>
+      </Container>
+
+      {/* 儲存確認對話框 */}
       <Dialog open={saveDialogOpen} onClose={handleCloseDialog}>
         <DialogTitle>儲存時間表</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography gutterBottom>
             請輸入管理員密碼以儲存時間表
           </Typography>
           <TextField
-            label="管理員密碼"
-            type="password"
             fullWidth
+            type="password"
+            label="管理員密碼"
             value={inputPwd}
             onChange={(e) => setInputPwd(e.target.value)}
             sx={{ mt: 2 }}
@@ -327,21 +370,16 @@ const SchedulePage = ({ adminPassword }) => {
             placeholder="請輸入密碼..."
           />
         </DialogContent>
-        <DialogActions sx={{ position: 'relative', minHeight: 80 }}>
+        <DialogActions>
           <Button onClick={handleCloseDialog}>取消</Button>
           <Button
-            variant="contained"
-            onMouseEnter={handleButtonHover}
             onClick={handleSaveClick}
+            onMouseEnter={handleButtonHover}
             sx={{
-              position: 'relative',
               transform: `translate(${buttonPos.x}px, ${buttonPos.y}px)`,
-              transition: 'transform 0.3s ease',
-              backgroundColor: !inputPwd.trim() ? '#ff9800' : '#1976d2',
-              '&:hover': {
-                backgroundColor: !inputPwd.trim() ? '#f57c00' : '#1565c0',
-              }
+              transition: 'transform 0.3s ease'
             }}
+            variant="contained"
           >
             {!inputPwd.trim() ? '按不到我喔' : '確認儲存'}
           </Button>

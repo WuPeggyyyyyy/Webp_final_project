@@ -1,0 +1,232 @@
+.schedule-page {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.trucks-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 60px;
+  padding: 8px;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  background-color: #fafafa;
+}
+
+.truck-chip {
+  transition: all 0.2s ease;
+}
+
+.truck-chip.dragging {
+  opacity: 0.8;
+  transform: rotate(5deg);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.month-title {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  color: #1976d2;
+}
+
+.week-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.week-day {
+  text-align: center;
+  font-weight: bold;
+  padding: 12px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  color: #1976d2;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.calendar-cell {
+  min-height: 150px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e0e0e0;
+  background-color: white;
+  transition: all 0.2s ease;
+}
+
+.calendar-cell:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.calendar-cell.other-month {
+  background-color: #f9f9f9;
+  opacity: 0.6;
+}
+
+.calendar-cell.today {
+  background-color: #fff3e0;
+  border: 2px solid #ff9800;
+}
+
+.date-number {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.calendar-cell.today .date-number {
+  color: #ff9800;
+}
+
+.calendar-cell.other-month .date-number {
+  color: #999;
+}
+
+.time-slot {
+  margin-bottom: 8px;
+  flex: 1;
+}
+
+.time-slot-label {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.drop-zone {
+  min-height: 30px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drop-zone.drag-over {
+  background-color: #e8f5e8;
+  border: 2px dashed #4caf50;
+}
+
+.scheduled-truck {
+  font-size: 0.7rem !important;
+  height: 20px !important;
+  margin-bottom: 2px;
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.scheduled-truck:active {
+  cursor: grabbing;
+}
+
+.scheduled-truck.dragging {
+  opacity: 0.8;
+  transform: rotate(3deg);
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .calendar-grid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  
+  .calendar-cell {
+    min-height: 120px;
+    padding: 4px;
+  }
+  
+  .date-number {
+    font-size: 0.9rem;
+  }
+  
+  .time-slot-label {
+    font-size: 0.65rem;
+  }
+  
+  .scheduled-truck {
+    font-size: 0.6rem !important;
+    height: 18px !important;
+  }
+  
+  .month-title {
+    font-size: 1.2rem;
+  }
+  
+  .calendar-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .week-day {
+    padding: 8px 4px;
+    font-size: 0.8rem;
+  }
+  
+  .calendar-cell {
+    min-height: 100px;
+    padding: 2px;
+  }
+  
+  .trucks-container {
+    min-height: 50px;
+    padding: 4px;
+  }
+}
+
+/* 動畫效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.calendar-cell {
+  animation: fadeIn 0.3s ease;
+}
+
+/* 拖拽時的視覺反饋 */
+.truck-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.drop-zone:empty::after {
+  content: "";
+  color: #ccc;
+  font-size: 0.6rem;
+  text-align: center;
+  display: block;
+  padding: 4px;
+}
+
+.drop-zone.drag-over:empty::after {
+  content: "放開以安排餐車";
+  color: #4caf50;
+}

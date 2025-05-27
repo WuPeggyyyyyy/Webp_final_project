@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AddTruckForm from './AddTruckForm';
 import TruckList from './TruckList';
 import SchedulePage from './SchedulePage';
-import ChangePassword from './ChangePassword'; // 引入你的 ChangePassword 元件
+import ChangePassword from './ChangePassword';
 import {
   AppBar, Toolbar, Typography, Container, Switch, FormControlLabel, CssBaseline,
   IconButton, Button, Menu, MenuItem
@@ -100,14 +100,19 @@ function App() {
 
         <Container>
           <Routes>
-            <Route path="/" element={<TruckList />} />
-            <Route path="/schedule" element={<SchedulePage />} />
+            <Route path="/" element={<TruckList adminPassword={adminPassword} />} />
+            <Route path="/schedule" element={<SchedulePage adminPassword={adminPassword}/>} />
           </Routes>
         </Container>
 
-        <AddTruckForm open={openAddForm} onClose={handleCloseAdd} />
-        
-        {/* 使用你現有的 ChangePassword 元件 */}
+
+        {/* 傳入 adminPassword ✅ */}
+        <AddTruckForm
+          open={openAddForm}
+          onClose={handleCloseAdd}
+          adminPassword={adminPassword}
+        />
+
         <ChangePassword 
           open={editPwdOpen} 
           onClose={handleClosePwdDialog}

@@ -4,7 +4,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  Button
 } from '@mui/material';
 import ProtectedButton from './ProtectedButton';
 
@@ -35,29 +36,31 @@ const ChangePassword = ({ open, onClose, adminPassword, setAdminPassword }) => {
       <DialogTitle>修改管理員密碼</DialogTitle>
       <DialogContent>
         <TextField
-          label="目前密碼"
           type="password"
+          label="目前密碼"
           fullWidth
-          sx={{ mt: 1 }}
+          margin="normal"
           value={currentPwd}
           onChange={(e) => setCurrentPwd(e.target.value)}
         />
         <TextField
-          label="新密碼"
           type="password"
+          label="新密碼"
           fullWidth
-          sx={{ mt: 2 }}
+          margin="normal"
           value={newPwd}
           onChange={(e) => setNewPwd(e.target.value)}
         />
       </DialogContent>
       <DialogActions>
+        <Button onClick={handleClose}>取消</Button>
         <ProtectedButton
-          label="確認修改"
-          disabledCondition={incomplete}
-          fallback="dialog"
-          onClick={handleSubmit}
-        />
+          onSubmit={handleSubmit}
+          disabled={incomplete}
+          variant="contained"
+        >
+          修改密碼
+        </ProtectedButton>
       </DialogActions>
     </Dialog>
   );

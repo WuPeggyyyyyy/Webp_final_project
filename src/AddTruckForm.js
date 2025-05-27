@@ -18,21 +18,28 @@ const AddTruckForm = ({ open, onClose, adminPassword }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // 新增缺少的 handleFormSubmit 函數
+  // 處理圖片上傳回調
+  const handleImageUpload = (urls) => {
+    setImageUrls(urls);
+  };
+
+  // 修正後的 handleFormSubmit 函數
   const handleFormSubmit = () => {
     if (!formData.name || !formData.type || !formData.location || imageUrls.length === 0) {
       alert('請填寫所有欄位並上傳至少一張圖片');
       return;
-    }
+    } // 添加缺失的閉合大括號
+    
     setConfirmOpen(true);
   };
 
+  // 修正後的 handleSubmit 函數
   const handleSubmit = async () => {
     if (!verifyAdminPassword(inputPwd, adminPassword)) {
       alert('密碼錯誤，新增失敗');
       return;
-    }
-
+    } // 添加缺失的閉合大括號
+    
     try {
       await addDoc(collection(db, 'trucks'), {
         ...formData,
@@ -51,6 +58,7 @@ const AddTruckForm = ({ open, onClose, adminPassword }) => {
     }
   };
 
+  // 這個變數現在可以正確計算了
   const formIncomplete = !formData.name || !formData.type || !formData.location || imageUrls.length === 0;
 
   // 按鈕躲避邏輯
@@ -76,15 +84,19 @@ const AddTruckForm = ({ open, onClose, adminPassword }) => {
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
         <DialogTitle>新增餐車</DialogTitle>
         <DialogContent>
-          <TruckFormFields formData={formData} handleChange={handleChange} />
-          <ImageUploader imageUrls={imageUrls} setImageUrls={setImageUrls} />
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TruckFormFields formData={formData} handleChange={handleChange} />
+            
+            {/* 正確整合 ImageUploader */}
+            <ImageUploader onUpload={handleImageUpload} />
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>取消</Button>
           <Button 
-            onClick={handleFormSubmit} 
-            variant="contained" 
+            onClick={handleFormSubmit}
             disabled={formIncomplete}
+            variant="contained"
           >
             新增餐車
           </Button>
@@ -96,27 +108,29 @@ const AddTruckForm = ({ open, onClose, adminPassword }) => {
         <DialogTitle>確認新增餐車</DialogTitle>
         <DialogContent>
           <TextField
-            autoFocus
-            margin="dense"
             label="請輸入管理員密碼"
             type="password"
-            fullWidth
-            variant="outlined"
             value={inputPwd}
             onChange={(e) => setInputPwd(e.target.value)}
+            fullWidth
+            margin="normal"
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>取消</Button>
-          <Box sx={{ position: 'relative' }}>
+          <Box
+            component="div"
+            sx={{
+              position: 'relative',
+              transform: `translate(${buttonPos.x}px, ${buttonPos.y}px)`,
+              transition: 'transform 0.3s ease',
+            }}
+          >
             <Button
-              onClick={handleButtonClick}
               onMouseEnter={handleButtonHover}
+              onClick={handleButtonClick}
               variant="contained"
-              sx={{
-                transform: `translate(${buttonPos.x}px, ${buttonPos.y}px)`,
-                transition: 'transform 0.3s ease',
-              }}
+              color="primary"
             >
               {!inputPwd.trim() ? '按不到我喔' : '確認新增'}
             </Button>

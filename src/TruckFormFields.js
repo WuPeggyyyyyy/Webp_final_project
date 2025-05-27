@@ -17,7 +17,7 @@ const TruckFormFields = ({ formData, handleChange }) => {
   const labelColor = isDark ? '#e0e0e0' : '#000000';
 
   const truckTypes = [
-    "台式", "中式料理", "日式料理", "韓式料理", "西式料理",
+    "台式料理", "中式料理", "日式料理", "韓式料理", "西式料理",
     "素食", "甜點／甜品", "飲料／咖啡", "麵食",
     "海鮮", "烤肉／燒烤", "速食", "早餐", "炸物", "其他"
   ];
