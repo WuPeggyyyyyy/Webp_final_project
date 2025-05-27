@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Stack, Button, Typography, CircularProgress } from '@mui/material';
+import IconButton from '@mui/material/IconButton';
 import { useTheme } from '@mui/material/styles';
+import CloseIcon from '@mui/icons-material/Close';
 
 const CLOUD_NAME = 'duij4v2sx';
 const UPLOAD_PRESET = 'CGUfoodtruck_preset';
@@ -16,8 +18,15 @@ const ImageUploader = ({ onUpload = () => {} }) => { // 提供預設值
   const [uploadedUrls, setUploadedUrls] = useState([]);
 
   const handleFileChange = (e) => {
-    const files = Array.from(e.target.files).slice(0, MAX_IMAGES);
-    setSelectedFiles(files);
+    const newFiles = Array.from(e.target.files);
+    const totalFiles = [...selectedFiles, ...newFiles].slice(0, MAX_IMAGES);
+    setSelectedFiles(totalFiles);
+  };
+
+  const handleRemoveFile = (index) => {
+    const updatedFiles = [...selectedFiles];
+    updatedFiles.splice(index, 1);
+    setSelectedFiles(updatedFiles);
   };
 
   const handleUpload = async () => {
@@ -48,12 +57,14 @@ const ImageUploader = ({ onUpload = () => {} }) => { // 提供預設值
         urls.push(data.secure_url);
       }
 
-      setUploadedUrls(urls);
+      setUploadedUrls([...uploadedUrls, ...urls]);
       
       // 確保 onUpload 是函數後再呼叫
       if (typeof onUpload === 'function') {
-        onUpload(urls);
+        onUpload([...uploadedUrls, ...urls]);
       }
+
+      setSelectedFiles([]); // 清空已上傳的選擇圖
       
     } catch (err) {
       console.error('Upload failed:', err);
@@ -63,10 +74,20 @@ const ImageUploader = ({ onUpload = () => {} }) => { // 提供預設值
     }
   };
 
+  const handleDeleteUploaded = (index) => {
+    setUploadedUrls(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      if (typeof onUpload === 'function') {
+        onUpload(updated); // ❗ 通知父元件更新
+      }
+      return updated;
+    });
+  };
+
   return (
     <Stack spacing={2}>
       <Typography variant="h6" color={textColor}>
-        圖片上傳
+        圖片上傳（最多 {MAX_IMAGES} 張）
       </Typography>
       
       <Button
@@ -90,6 +111,43 @@ const ImageUploader = ({ onUpload = () => {} }) => { // 提供預設值
         </Typography>
       )}
 
+       {selectedFiles.length > 0 && (
+        <Stack spacing={1}>
+          <Typography variant="body2" color={textColor}>
+            已選擇圖片：
+          </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            {selectedFiles.map((file, idx) => (
+              <div key={idx} style={{ position: 'relative' }}>
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={`preview-${idx}`}
+                  style={{
+                    width: '100px',
+                    height: '100px',
+                    objectFit: 'cover',
+                    borderRadius: '4px',
+                  }}
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => handleRemoveFile(idx)}
+                  style={{
+                    position: 'absolute',
+                    top: -8,
+                    right: -8,
+                    background: '#fff',
+                    border: '1px solid #ccc',
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </div>
+            ))}
+          </Stack>
+        </Stack>
+      )}
+
       <Button
         variant="contained"
         onClick={handleUpload}
@@ -108,21 +166,39 @@ const ImageUploader = ({ onUpload = () => {} }) => { // 提供預設值
       {uploadedUrls.length > 0 && (
         <Stack spacing={1}>
           <Typography variant="body2" color={textColor}>
-            上傳成功的圖片:
+            上傳成功的圖片：
           </Typography>
-          {uploadedUrls.map((url, idx) => (
-            <img
-              key={idx}
-              src={url}
-              alt={`uploaded-${idx}`}
-              style={{
-                width: '100px',
-                height: '100px',
-                objectFit: 'cover',
-                borderRadius: '4px'
-              }}
-            />
-          ))}
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            {uploadedUrls.map((url, idx) => (
+              <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
+                <img
+                  src={url}
+                  alt={`uploaded-${idx}`}
+                  style={{
+                    width: '100px',
+                    height: '100px',
+                    objectFit: 'cover',
+                    borderRadius: '4px',
+                    marginRight: '8px'
+                  }}
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => handleDeleteUploaded(idx)}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    color: 'white'
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </div>
+            ))}
+
+          </Stack>
         </Stack>
       )}
     </Stack>
