@@ -4,12 +4,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import ImageUploader from './ImageUploader';
 import { verifyAdminPassword } from './useAdminAuth';
 import TruckFormFields from './TruckFormFields';
+import { Button, Stack, Dialog, DialogTitle, DialogActions, DialogContent, TextField, Box } from '@mui/material';
 
-import {
-  Button, Stack, Dialog, DialogTitle, DialogActions, DialogContent, TextField, Box
-} from '@mui/material';
-
-const AddTruckForm = ({ onClose, adminPassword }) => {
+const AddTruckForm = ({ open, onClose, adminPassword }) => {
   const [formData, setFormData] = useState({ name: '', type: '', location: '' });
   const [imageUrls, setImageUrls] = useState([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -21,8 +18,17 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (password) => {
-    if (!verifyAdminPassword(password, adminPassword)) {
+  // 新增缺少的 handleFormSubmit 函數
+  const handleFormSubmit = () => {
+    if (!formData.name || !formData.type || !formData.location || imageUrls.length === 0) {
+      alert('請填寫所有欄位並上傳至少一張圖片');
+      return;
+    }
+    setConfirmOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!verifyAdminPassword(inputPwd, adminPassword)) {
       alert('密碼錯誤，新增失敗');
       return;
     }
@@ -36,6 +42,8 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
       alert('新增成功');
       setFormData({ name: '', type: '', location: '' });
       setImageUrls([]);
+      setInputPwd('');
+      setConfirmOpen(false);
       if (onClose) onClose();
     } catch (error) {
       console.error('新增失敗:', error);
@@ -48,7 +56,6 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
   // 按鈕躲避邏輯
   const handleButtonHover = () => {
     if (!inputPwd.trim()) {
-      // 如果密碼為空，按鈕就躲避
       const maxMove = 100;
       const randomX = Math.floor(Math.random() * maxMove * 2 - maxMove);
       const randomY = Math.floor(Math.random() * maxMove * 2 - maxMove);
@@ -66,46 +73,52 @@ const AddTruckForm = ({ onClose, adminPassword }) => {
 
   return (
     <>
-      <form onSubmit={handleFormSubmit}>
-        <Stack spacing={2}>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <DialogTitle>新增餐車</DialogTitle>
+        <DialogContent>
           <TruckFormFields formData={formData} handleChange={handleChange} />
-          <ImageUploader onUpload={setImageUrls} />
-          <Button type="submit" variant="contained" color="warning">
-            送出
+          <ImageUploader imageUrls={imageUrls} setImageUrls={setImageUrls} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>取消</Button>
+          <Button 
+            onClick={handleFormSubmit} 
+            variant="contained" 
+            disabled={formIncomplete}
+          >
+            新增餐車
           </Button>
-        </Stack>
-      </form>
+        </DialogActions>
+      </Dialog>
 
+      {/* 密碼確認對話框 */}
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>確認新增？</DialogTitle>
+        <DialogTitle>確認新增餐車</DialogTitle>
         <DialogContent>
           <TextField
-            label="管理員密碼"
+            autoFocus
+            margin="dense"
+            label="請輸入管理員密碼"
             type="password"
             fullWidth
+            variant="outlined"
             value={inputPwd}
             onChange={(e) => setInputPwd(e.target.value)}
-            sx={{ mt: 2 }}
-            autoFocus
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>取消</Button>
-          
-          {/* 有趣的躲避按鈕 */}
-          <Box sx={{ position: 'relative', display: 'inline-block' }}>
+          <Box sx={{ position: 'relative' }}>
             <Button
-              onMouseEnter={handleButtonHover}
               onClick={handleButtonClick}
+              onMouseEnter={handleButtonHover}
               variant="contained"
-              color="primary"
               sx={{
                 transform: `translate(${buttonPos.x}px, ${buttonPos.y}px)`,
                 transition: 'transform 0.3s ease',
-                position: 'relative',
               }}
             >
-              確認新增
+              {!inputPwd.trim() ? '按不到我喔' : '確認新增'}
             </Button>
           </Box>
         </DialogActions>
