@@ -115,7 +115,7 @@ function TruckList({ adminPassword, globalSchedule }) {
 
     try {
       await addDoc(collection(db, 'trucks', truckId, 'reviews'), {
-        userId: 'demo-user',
+        userId: '匿名',
         rating: Number(data.rating),
         comment: data.comment,
         timestamp: serverTimestamp(),
